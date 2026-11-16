@@ -6,6 +6,7 @@
 const LISENSI = {
   "CC BY-SA 4.0": "https://creativecommons.org/licenses/by-sa/4.0/deed.id",
   "CC BY 4.0": "https://creativecommons.org/licenses/by/4.0/deed.id",
+  "CC BY 3.0": "https://creativecommons.org/licenses/by/3.0/deed.id",
 };
 const KONDISI = [
   { nama: "Baik", warna: "#2E9E4F", teks: "#1E2329", rentang: "IRI < 4",
@@ -31,10 +32,42 @@ const KONDISI = [
 ];
 const INFO = Object.fromEntries(KONDISI.map((k) => [k.nama, k]));
 
-// Baris kredit foto (HTML) untuk ditampilkan di bawah foto kelas kondisi
-const kreditFoto = (k) =>
-  `Foto: <a href="${k.foto.url}" target="_blank" rel="noopener">${esc(k.foto.oleh)}</a>, ${esc(k.foto.lokasi)} · ` +
-  `<a href="${LISENSI[k.foto.lisensi]}" target="_blank" rel="noopener">${k.foto.lisensi}</a> · Wikimedia Commons`;
+// Galeri: foto tambahan per kelas (Wikimedia Commons). Kelas dipilih dari tampilan foto, sebagai contoh visual;
+// bukan hasil pengukuran IRI. Foto utama tiap kelas (di atas) ikut ditampilkan di galeri.
+const COMMONS = (berkas) => `https://commons.wikimedia.org/wiki/File:${berkas.replace(/ /g, "_")}`;
+const GALERI_TAMBAHAN = [
+  { kelas: "Baik", gambar: "img/kondisi/galeri/baik-palimanan-cirebon.jpg", lokasi: "Jl. Raya Palimanan, Kab. Cirebon",
+    oleh: "Jie73", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan Raya Palimanan-.jpg") },
+  { kelas: "Baik", gambar: "img/kondisi/galeri/baik-gempol-cirebon.jpg", lokasi: "Jl. Raya Gempol–Palimanan, Kab. Cirebon",
+    oleh: "Jie73", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan Raya KH Agus Salim Gempol.jpg") },
+  { kelas: "Baik", gambar: "img/kondisi/galeri/baik-ciledug-garut.jpg", lokasi: "Jl. Ciledug, Kab. Garut",
+    oleh: "Ketut Turag", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan ciledug garut.jpg") },
+  { kelas: "Sedang", gambar: "img/kondisi/galeri/sedang-ciwaringin-cirebon.jpg", lokasi: "Jl. Raya Ciwaringin, Kab. Cirebon",
+    oleh: "Jie73", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan Raya Ciwaringin.jpg") },
+  { kelas: "Sedang", gambar: "img/kondisi/galeri/sedang-limbangan-garut.jpg", lokasi: "Jalan beton, Limbangan, Kab. Garut",
+    oleh: "Laela Megarani", lisensi: "CC BY-SA 4.0", url: COMMONS("Wisata alam .jpg") },
+  { kelas: "Rusak Ringan", gambar: "img/kondisi/galeri/rusak-ringan-kaswari-kebumen.jpg", lokasi: "Penambalan lubang, Kebumen, Jawa Tengah",
+    oleh: "DARMAS BS 9", lisensi: "CC BY-SA 4.0", url: COMMONS("Perbaikan Jalan Aspal Yg Berlubang Di Jl.Kaswari Kebumen Oleh PUPR Kab.Kebumen.jpg") },
+  { kelas: "Rusak Ringan", gambar: "img/kondisi/galeri/rusak-ringan-ambal-kebumen.jpg", lokasi: "Ambal, Kebumen, Jawa Tengah",
+    oleh: "SATELIT BM9", lisensi: "CC BY-SA 4.0", url: COMMONS("Rambu Hati Hati Jalan Berlubang Di Ambal Kebumen 2022.jpg") },
+  { kelas: "Rusak Berat", gambar: "img/kondisi/galeri/rusak-berat-cikandang-garut.jpg", lokasi: "Cikandang, Kab. Garut",
+    oleh: "Mochammad chotib", lisensi: "CC BY-SA 4.0", url: COMMONS("CAM00298.jpg") },
+  { kelas: "Rusak Berat", gambar: "img/kondisi/galeri/rusak-berat-soegiono-kebumen.jpg", lokasi: "Jalan amblas, Kebumen, Jawa Tengah",
+    oleh: "DARMAS SB 9", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan amblas Di Jl.Soegiono Kebumen Jateng Indonesia.jpg") },
+  { kelas: "Rusak Berat", gambar: "img/kondisi/galeri/rusak-berat-samarinda.jpg", lokasi: "Jalan amblas, Samarinda, Kalimantan Timur",
+    oleh: "Kurniawan Dwi", lisensi: "CC BY 3.0", url: COMMONS("Jalan Samarinda Amblas - panoramio.jpg") },
+];
+const GALERI = [
+  ...KONDISI.map((k) => ({ kelas: k.nama, gambar: k.gambar, ...k.foto })),
+  ...GALERI_TAMBAHAN,
+].sort((a, b) => KONDISI.findIndex((k) => k.nama === a.kelas) - KONDISI.findIndex((k) => k.nama === b.kelas));
+
+// Baris kredit foto (HTML); menerima kelas kondisi (k.foto) atau entri galeri
+const kreditFoto = (k) => {
+  const f = k.foto || k;
+  return `Foto: <a href="${f.url}" target="_blank" rel="noopener">${esc(f.oleh)}</a>, ${esc(f.lokasi)} · ` +
+    `<a href="${LISENSI[f.lisensi]}" target="_blank" rel="noopener">${f.lisensi}</a> · Wikimedia Commons`;
+};
 
 // Peta dasar tanpa API key. (Ubin CARTO sekarang mewajibkan key, jadi tidak dipakai.)
 // "label" = lapisan tulisan (nama tempat) yang ditumpuk di atas peta dasar.

@@ -242,6 +242,97 @@ app.get("/api/terdekat", rute(async (req, res) => {
   res.json({ pusat: { lat, lng }, radius_m: radius, ...keFeatureCollection(r.rows, "id") });
 }));
 
+// Foto lapangan di sekitar satu titik, dikumpulkan dari beberapa sumber terbuka (tanpa API key):
+//  1. Temanjabar, layer WFS "pemeliharaan": foto dokumentasi pemeliharaan DBMPR (sebelum/saat/sesudah), 2021-2023
+//  2. Wikimedia Commons: foto bertanda lokasi (geotag) berlisensi bebas, dengan tanggal pengambilan
+// Setiap sumber diambil terpisah; bila satu sumber gagal, sumber lain tetap ditampilkan. Berkas foto tidak disalin.
+const WFS_TJ = "https://geo.temanjabar.net/geoserver/wfs";
+const FOTO_TJ = "https://tj.temanjabar.net/storage/pekerjaan/";
+const TAHUN_DATA = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]; // rentang data Galura
+const cacheFoto = new Map();
+const jarakM = (a, b, c, d) => { // haversine, meter
+  const r = Math.PI / 180, x = Math.sin(((c - a) * r) / 2), y = Math.sin(((d - b) * r) / 2);
+  return 2 * 6371000 * Math.asin(Math.sqrt(x * x + Math.cos(a * r) * Math.cos(c * r) * y * y));
+};
+const ambilJSON = async (url) => {
+  const r = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { "User-Agent": "SIKOJAB/1.0 (tugas kuliah WebGIS)" } });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+};
+const bersihHTML = (s) => String(s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+
+async function fotoTemanjabar(lat, lng, radius) {
+  const dLat = radius / 111320, dLng = radius / (111320 * Math.cos((lat * Math.PI) / 180));
+  const cql = `BBOX(geom,${lng - dLng},${lat - dLat},${lng + dLng},${lat + dLat}) AND foto_awal<>''`;
+  const data = await ambilJSON(`${WFS_TJ}?service=WFS&version=1.0.0&request=GetFeature&typeName=temanjabar:pemeliharaan` +
+    "&outputFormat=application/json&maxFeatures=500" +
+    "&propertyName=id,tanggal,ruas_jalan,jenis_pekerjaan,paket,lokasi,lat,long,foto_awal,foto_sedang,foto_akhir,is_deleted" +
+    `&CQL_FILTER=${encodeURIComponent(cql)}`);
+  return (data.features || []).map((f) => f.properties)
+    .filter((p) => !p.is_deleted && p.lat && p.long && !/wallpaper/i.test(p.foto_awal))
+    .map((p) => ({
+      sumber: "temanjabar",
+      tanggal: String(p.tanggal).slice(0, 10),
+      judul: p.ruas_jalan,
+      ket: [(p.paket || p.jenis_pekerjaan || "").trim(), String(p.lokasi || "").replace(/\s+/g, " ").trim()].filter(Boolean).join(" · "),
+      kredit: "Dokumentasi pemeliharaan DBMPR Jawa Barat (Temanjabar)",
+      lat: Number(p.lat), lng: Number(p.long),
+      jarak_m: Math.round(jarakM(lat, lng, Number(p.lat), Number(p.long))),
+      foto: [["Sebelum", p.foto_awal], ["Saat dikerjakan", p.foto_sedang], ["Sesudah", p.foto_akhir]]
+        .filter(([, f]) => f).map(([label, f]) => ({ label, url: FOTO_TJ + encodeURIComponent(f) })),
+    }));
+}
+
+async function fotoCommons(lat, lng, radius) {
+  const q = new URLSearchParams({
+    action: "query", format: "json", generator: "geosearch", ggscoord: `${lat}|${lng}`, ggsradius: String(Math.max(radius, 10)),
+    ggsnamespace: "6", ggslimit: "50", prop: "imageinfo|coordinates", iiprop: "url|extmetadata", iiurlwidth: "800",
+  });
+  const data = await ambilJSON(`https://commons.wikimedia.org/w/api.php?${q}`);
+  return Object.values(data.query?.pages || {}).map((p) => {
+    const ii = p.imageinfo?.[0] || {}, m = ii.extmetadata || {}, c = p.coordinates?.[0];
+    const lis = m.LicenseShortName?.value || "";
+    if (!/^(CC BY|CC0|Public domain)/i.test(lis) || /NC|ND/.test(lis) || !c || !/\.(jpe?g|png|webp)$/i.test(p.title)) return null;
+    const tgl = (m.DateTimeOriginal?.value || m.DateTime?.value || "").match(/\d{4}-\d{2}-\d{2}|\d{4}:\d{2}:\d{2}/);
+    return {
+      sumber: "commons",
+      tanggal: tgl ? tgl[0].replace(/:/g, "-") : "",
+      judul: bersihHTML(m.ObjectName?.value) || p.title.replace(/^File:/, "").replace(/\.[a-z]+$/i, ""),
+      ket: bersihHTML(m.ImageDescription?.value).slice(0, 160),
+      kredit: `${bersihHTML(m.Artist?.value) || "Kontributor"} · ${lis} · Wikimedia Commons`,
+      tautan: ii.descriptionurl,
+      lat: c.lat, lng: c.lon,
+      jarak_m: Math.round(jarakM(lat, lng, c.lat, c.lon)),
+      foto: [{ label: "Foto", url: ii.thumburl || ii.url }],
+    };
+  }).filter((p) => p && p.jarak_m <= radius);
+}
+
+app.get("/api/foto", rute(async (req, res) => {
+  const lat = ambilAngka(req.query.lat, "lat", { min: -8.5, maks: -5.5, wajib: true });
+  const lng = ambilAngka(req.query.lng, "lng", { min: 105.5, maks: 109.5, wajib: true });
+  const radius = ambilAngka(req.query.radius, "radius", { min: 50, maks: 1000, bawaan: 300 });
+  const kunci = `${lat.toFixed(4)},${lng.toFixed(4)},${radius}`;
+  if (!cacheFoto.has(kunci)) {
+    const SUMBER = [["temanjabar", "Temanjabar (DBMPR)", fotoTemanjabar], ["commons", "Wikimedia Commons", fotoCommons]];
+    const hasil = await Promise.allSettled(SUMBER.map(([, , fn]) => fn(lat, lng, radius)));
+    const status = SUMBER.map(([kode, nama], i) => ({ kode, nama, ok: hasil[i].status === "fulfilled",
+      jumlah: hasil[i].status === "fulfilled" ? hasil[i].value.length : 0 }));
+    const semua = hasil.flatMap((h) => (h.status === "fulfilled" ? h.value : []))
+      .sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || "") || a.jarak_m - b.jarak_m);
+    if (cacheFoto.size > 500) cacheFoto.clear();
+    // hasil yang semua sumbernya gagal tidak disimpan, supaya bisa dicoba lagi
+    if (status.some((s) => s.ok)) cacheFoto.set(kunci, { status, semua });
+    else return res.json({ pusat: { lat, lng }, radius_m: radius, sumber: status, per_tahun: [], foto: [] });
+  }
+  const { status, semua } = cacheFoto.get(kunci);
+  res.json({
+    pusat: { lat, lng }, radius_m: radius, sumber: status,
+    per_tahun: TAHUN_DATA.map((t) => ({ tahun: t, jumlah: semua.filter((p) => p.tanggal.startsWith(String(t))).length })),
+    foto: semua.slice(0, 100),
+  });
+}));
+
 // Tren tahunan (Galura Data Jabar) - provinsi, atau satu Kab/Kota bila ?kab_kota= diisi
 app.get("/api/tren", rute(async (req, res) => {
   const r = await pool.query(

@@ -47,7 +47,7 @@ webgis-kondisi-jalan/
 ├── public/      tampilan web
 │   ├── index.html, dashboard.html, peta.html, validasi.html, tentang.html
 │   ├── css/     style.css (tema + aplikasi peta), situs.css (halaman situs)
-│   ├── img/kondisi/     ilustrasi 4 kelas kondisi (SVG)
+│   ├── img/kondisi/     foto contoh 4 kelas kondisi; galeri/ berisi 10 foto tambahan
 │   ├── js/      konfigurasi.js, situs.js (menu + tema), peta.js (Leaflet), panel.js (panel peta),
 │   │            dashboard.js, validasi.js
 │   └── vendor/  Leaflet 1.9.4, Chart.js 4.4.7, font Barlow (disalin lokal)
@@ -130,6 +130,7 @@ Semua endpoint bersifat `GET` dan memakai kueri berparameter.
 | `/api/terdekat?lat=&lng=&radius=&limit=&kondisi=` | Segmen dalam radius (meter) dari titik, urut terdekat. Bawaan: rusak ringan & berat |
 | `/api/tren?kab_kota=` | Tren tahunan 2018–2025 (Galura) |
 | `/api/peringkat?tahun=` | Peringkat Kab/Kota berdasarkan persen jalan mantap |
+| `/api/foto?lat=&lng=&radius=300` | Foto lapangan di sekitar titik, dikelompokkan per tahun 2018–2025: dokumentasi pemeliharaan DBMPR (Temanjabar, 2021–2023) dan foto bertanda lokasi Wikimedia Commons. Diambil langsung dari sumbernya dan disimpan sementara di memori server |
 | `/api/validasi` | Hasil 26 pemeriksaan keakuratan data, pemeriksaan silang DBMPR dan BPS, dan perbandingan dengan Galura 2021 |
 
 Kesalahan dikembalikan sebagai `{ "galat": "pesan" }` dengan kode 400 (input salah), 404, 503 (database tidak dapat diakses), atau 500.
@@ -160,9 +161,13 @@ Hasil pada data saat ini dibagi dua jenis:
 
 ## Gambar kondisi
 
-Empat ilustrasi SVG ada di `public/img/kondisi/` (baik, sedang, rusak-ringan, rusak-berat). Ilustrasi ini bersifat umum, bukan foto ruas tertentu. Untuk melihat kondisi nyata, pakai tombol **Street View** (tautan resmi Google Maps ke koordinat segmen).
+Foto contoh tiap kelas ada di `public/img/kondisi/foto-*.jpg`, dan 10 foto tambahan untuk galeri Beranda ada di `public/img/kondisi/galeri/` (Baik 4, Sedang 3, Rusak Ringan 3, Rusak Berat 4 termasuk foto utama). Enam foto galeri berasal dari Jawa Barat (Kab. Cirebon dan Kab. Garut). Semua foto dari Wikimedia Commons berlisensi CC BY / CC BY-SA; pemilik, lokasi, dan lisensi ditampilkan di bawah setiap foto dan di halaman Tentang. Kelas pada foto ditentukan dari tampilan permukaan jalan sebagai contoh visual, bukan hasil pengukuran IRI. Untuk melihat kondisi nyata ruas tertentu, pakai tombol **Street View** di halaman Peta.
 
-Untuk mengganti dengan foto sendiri, taruh berkas di `public/img/kondisi/` lalu ubah nilai `gambar` pada `KONDISI` di `public/js/konfigurasi.js` (mis. `"img/kondisi/baik.jpg"`).
+Bagian **Sebelum dan sesudah perbaikan** di Beranda memakai foto asli dokumentasi pemeliharaan DBMPR Jawa Barat dari Temanjabar (layer WFS `pemeliharaan`, kolom `foto_awal` dan `foto_akhir`; berkasnya di `tj.temanjabar.net/storage/pekerjaan/`). Dipilih 12 pekerjaan tambal sulam hotmix, dua dari setiap UPTD, lalu foto diperkecil ke lebar 1.200 px dan disimpan di `public/img/kondisi/pemeliharaan/`. Datanya ada di `public/js/foto_pemeliharaan.js`, termasuk kondisi segmen survei Roadroid terdekat (maks. 200 m) yang dicari dengan PostGIS. Foto diambil 2021–2023 sedangkan survei Januari 2021, jadi keduanya tidak selalu sama persis.
+
+Di halaman **Peta**, pop-up segmen punya tombol **Foto per tahun**. Tombol ini membuka jendela berisi foto lapangan dalam radius 300 m (bisa diperluas ke 1 km) dengan pilihan tahun 2018–2025, mirip *Lihat tanggal lain* di Google Maps. Foto diambil dari Temanjabar (layer `pemeliharaan`, foto sebelum, saat, dan sesudah pekerjaan; tersedia 2021–2023) dan Wikimedia Commons (foto bertanda lokasi berlisensi bebas). Tahun yang tidak punya foto ditampilkan apa adanya. Untuk tahun lain tersedia tombol Street View, karena foto Google tidak boleh diambil langsung. Sumber lain yang dicoba: Mapillary (perlu token akun), KartaView (server tidak dapat diakses), dan Flickr (perlu API key).
+
+Untuk menambah foto, taruh berkas di `public/img/kondisi/galeri/` lalu tambahkan entri pada `GALERI_TAMBAHAN` di `public/js/konfigurasi.js` (kelas, lokasi, pemilik, lisensi, dan tautan sumber).
 
 ## Lokasi saya
 

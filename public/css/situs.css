@@ -140,3 +140,43 @@ a.kartu:hover { border-color: var(--redup); transform: translateY(-2px); }
   .grafik-peringkat { height: 720px; }
   .validasi-ringkas .tombol { margin-left: 0; }
 }
+
+/* ---------- galeri foto kondisi (Beranda) ---------- */
+.saring-galeri { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.saring-galeri button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border: 1px solid var(--garis);
+  border-radius: 999px; background: var(--tinta-2); color: var(--teks); font: 500 14px/1.2 var(--f-badan); cursor: pointer; }
+.saring-galeri button small { color: var(--redup); font-size: 12.5px; }
+.saring-galeri button[aria-pressed="true"] { background: var(--aksen); color: var(--aksen-teks); border-color: var(--aksen); }
+.saring-galeri button[aria-pressed="true"] small { color: inherit; opacity: .75; }
+.saring-galeri .titik { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.galeri { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.foto-galeri { margin: 0; background: var(--tinta-2); border: 1px solid var(--garis); border-radius: 10px; overflow: hidden; }
+.foto-galeri button { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.foto-galeri img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; transition: transform .25s; }
+.foto-galeri button:hover img, .foto-galeri button:focus-visible img { transform: scale(1.04); }
+.foto-galeri figcaption { padding: 10px 12px 12px; font-size: 14px; line-height: 1.4; }
+.foto-galeri figcaption .kredit-foto { display: block; margin-top: 6px !important; }
+.kotak-foto { max-width: min(1000px, 94vw); padding: 0; border: 0; border-radius: 10px; background: var(--tinta); color: var(--teks); }
+.kotak-foto::backdrop { background: var(--latar-dialog); }
+.kotak-foto img { display: block; max-width: 100%; max-height: 78vh; margin: 0 auto; }
+.kotak-foto p { margin: 0; padding: 12px 16px 14px; font-size: 14px; }
+.kotak-foto form { position: absolute; top: 8px; right: 8px; margin: 0; }
+.tutup-foto { width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+@media (max-width: 600px) { .galeri { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .foto-galeri figcaption { font-size: 13px; } }
+
+/* ---------- sebelum dan sesudah pemeliharaan (Beranda) ---------- */
+.kepala-pml { margin-top: 40px; }
+.kepala-pml h3 { font: 600 24px/1.2 var(--f-judul); margin: 0 0 6px; }
+.galeri-pml { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.kartu-pml { margin: 0; background: var(--tinta-2); border: 1px solid var(--garis); border-radius: 10px; overflow: hidden; }
+.pasang-foto { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--garis); }
+.pasang-foto button { position: relative; display: block; padding: 0; border: 0; background: none; cursor: zoom-in; overflow: hidden; }
+.pasang-foto img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; transition: transform .25s; }
+.pasang-foto button:hover img, .pasang-foto button:focus-visible img { transform: scale(1.05); }
+.label-foto { position: absolute; left: 8px; top: 8px; padding: 2px 8px; border-radius: 4px; background: rgba(0, 0, 0, .7); color: #fff; font-size: 12.5px; font-weight: 600; }
+.kartu-pml figcaption { padding: 10px 12px 12px; font-size: 14px; line-height: 1.45; }
+.kartu-pml figcaption p { margin: 0; }
+.meta-pml { color: var(--redup); font-size: 13px; margin-top: 2px !important; }
+.survei-pml { margin-top: 8px !important; padding-top: 8px; border-top: 1px solid var(--garis); font-size: 13.5px; }
+.chip-pml { background: var(--aksen); color: var(--aksen-teks); }
+@media (max-width: 600px) { .galeri-pml { grid-template-columns: 1fr; } }

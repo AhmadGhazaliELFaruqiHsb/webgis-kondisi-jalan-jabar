@@ -52,7 +52,9 @@ const Peta = (() => {
       <div class="pop-baris"><span>Segmen</span><span>Km ${fmt(p.km_awal, 1)} - ${fmt(p.km_akhir, 1)}</span></div>
       <div class="pop-baris"><span>Nilai IRI</span><span>${fmt(p.nilai_iri, 2)} m/km</span></div>
       <div class="pop-baris"><span>Kondisi</span><span class="chip" style="background:${k.warna};color:${k.teks}">${k.nama}</span></div>
-      <div class="pop-aksi"><button type="button" class="tombol" data-aksi="detail" data-id="${esc(p.idruas)}">Lihat detail ruas</button>${sv}</div>`;
+      <div class="pop-aksi"><button type="button" class="tombol" data-aksi="detail" data-id="${esc(p.idruas)}">Lihat detail ruas</button>${latlng
+        ? `<button type="button" class="tombol tombol-isi" data-aksi="foto" data-lat="${latlng.lat}" data-lng="${latlng.lng}" data-nama="${esc(p.nm_ruas)}"
+             title="Foto lapangan di sekitar titik ini, per tahun">Foto per tahun</button>` : ""}${sv}</div>`;
   }
 
   function kaitkan(feature, layer, aksiKlik) {
@@ -70,6 +72,7 @@ const Peta = (() => {
   function init(opsi) {
     kembali = opsi;
     map = L.map("peta", { zoomControl: false, preferCanvas: true, minZoom: 6, maxZoom: 18, center: [-6.9, 107.6], zoom: 8 });
+    FotoLokasi.pasang(map);
     // tata letak ala Google Maps: zoom dan "lokasi saya" di kanan bawah, pilihan lapisan di kiri bawah
     L.control.zoom({ position: "bottomright" }).addTo(map);
     const ctrlLokasi = L.control({ position: "bottomright" });
@@ -195,6 +198,9 @@ const Peta = (() => {
       map.eachLayer((l) => l.closeTooltip && l.closeTooltip()); // tooltip hover tidak menimpa pop-up
       const tombol = e.popup.getElement()?.querySelector('[data-aksi="detail"]');
       if (tombol) tombol.addEventListener("click", () => { kembali.detail(tombol.dataset.id); map.closePopup(); });
+      const tFoto = e.popup.getElement()?.querySelector('[data-aksi="foto"]');
+      if (tFoto) tFoto.addEventListener("click", () =>
+        FotoLokasi.buka(Number(tFoto.dataset.lat), Number(tFoto.dataset.lng), tFoto.dataset.nama));
     });
 
     map.on("zoomend", segarkanGaya);
@@ -251,6 +257,7 @@ const Peta = (() => {
       onEachFeature: (f, layer) => kaitkan(f, layer, (e, p) => {
         L.popup({ maxWidth: 300, className: "pop" }).setLatLng(e.latlng).setContent(isiPopup(p, e.latlng, arahSegmen(f.geometry))).openOn(map);
         kembali.pilihRuas(p.idruas, e.latlng);
+        FotoLokasi.strip(e.latlng.lat, e.latlng.lng, p.nm_ruas); // deretan foto di bawah peta, seperti Google Maps
       }),
     });
     grupSegmen.clearLayers();
@@ -281,8 +288,10 @@ const Peta = (() => {
     if (nama === "ruas" && nyala) grupRuas.eachLayer((l) => l.bringToBack && l.bringToBack());
   }
 
-  const bukaPopupSegmen = (latlng, props, arah = 0) =>
-    L.popup({ maxWidth: 300, className: "pop" }).setLatLng(latlng).setContent(isiPopup(props, latlng, arah)).openOn(map);
+  const bukaPopupSegmen = (latlng, props, arah = 0) => {
+    FotoLokasi.strip(latlng.lat, latlng.lng, props.nm_ruas);
+    return L.popup({ maxWidth: 300, className: "pop" }).setLatLng(latlng).setContent(isiPopup(props, latlng, arah)).openOn(map);
+  };
 
   function sorotRuas(geometri) {
     grupSorot.clearLayers();

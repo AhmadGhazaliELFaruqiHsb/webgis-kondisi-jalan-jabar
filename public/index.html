@@ -136,6 +136,38 @@
       <div class="halaman">
         <div class="bagian-kepala">
           <div>
+            <span class="label-atas">Galeri</span>
+            <h2>Foto kondisi jalan</h2>
+            <p>Contoh nyata tiap kelas kondisi, sebagian dari Jawa Barat (Cirebon dan Garut). Klik foto untuk memperbesar.</p>
+          </div>
+        </div>
+        <div class="saring-galeri" id="saringGaleri" role="group" aria-label="Saring foto menurut kondisi"></div>
+        <div class="galeri" id="galeri"></div>
+        <p class="sumber">Semua foto dari Wikimedia Commons dengan lisensi bebas (CC BY / CC BY-SA). Kelas pada foto ditentukan dari tampilan permukaan jalan sebagai contoh visual, bukan hasil pengukuran IRI.</p>
+
+        <div class="bagian-kepala kepala-pml">
+          <div>
+            <h3>Sebelum dan sesudah perbaikan, di ruas jalan provinsi</h3>
+            <p>Foto asli dokumentasi pemeliharaan DBMPR Jawa Barat (tambal sulam hotmix), dua pekerjaan dari setiap UPTD.
+              Di bawahnya ditampilkan kondisi segmen 1 km hasil survei Roadroid di titik yang sama.</p>
+          </div>
+        </div>
+        <div class="galeri-pml" id="galeriPml"></div>
+        <p class="sumber">Sumber foto: dokumentasi pemeliharaan DBMPR Jawa Barat lewat Temanjabar (layer <code>pemeliharaan</code>). Foto diambil 2021–2023,
+          sedangkan survei Roadroid Januari 2021, dan nilai IRI adalah rata-rata segmen 1 km, jadi lubang di foto bisa lebih parah atau lebih ringan daripada kelas segmennya.</p>
+      </div>
+    </section>
+
+    <dialog class="kotak-foto" id="kotakFoto" aria-label="Foto diperbesar">
+      <form method="dialog"><button class="tutup-foto" aria-label="Tutup">×</button></form>
+      <img id="fotoBesar" alt="">
+      <p id="ketFotoBesar"></p>
+    </dialog>
+
+    <section class="bagian">
+      <div class="halaman">
+        <div class="bagian-kepala">
+          <div>
             <span class="label-atas">Sumber data</span>
             <h2>Dari mana datanya</h2>
           </div>
@@ -179,6 +211,7 @@
 
   <script src="js/konfigurasi.js"></script>
   <script src="js/situs.js"></script>
+  <script src="js/foto_pemeliharaan.js"></script>
   <script>
     "use strict";
     // kartu kelas kondisi
@@ -191,6 +224,64 @@
           <p class="kredit-foto">${kreditFoto(k)}</p>
         </div>
       </div>`).join("");
+
+    // galeri foto kondisi, bisa disaring per kelas; klik untuk memperbesar
+    const galeri = document.getElementById("galeri"), saring = document.getElementById("saringGaleri");
+    const ketFoto = (f) => `<span class="chip" style="background:${INFO[f.kelas].warna};color:${INFO[f.kelas].teks}">${f.kelas}</span> ${esc(f.lokasi)}`;
+    let kelasGaleri = "";
+    const gambarGaleri = () => {
+      galeri.innerHTML = GALERI.map((f, i) => [f, i]).filter(([f]) => !kelasGaleri || f.kelas === kelasGaleri).map(([f, i]) => `
+        <figure class="foto-galeri">
+          <button type="button" data-i="${i}" aria-label="Perbesar foto ${f.kelas.toLowerCase()}, ${esc(f.lokasi)}">
+            <img src="${f.gambar}" alt="Jalan kondisi ${f.kelas.toLowerCase()}, ${esc(f.lokasi)}" loading="lazy"></button>
+          <figcaption>${ketFoto(f)}<small class="kredit-foto">${kreditFoto(f)}</small></figcaption>
+        </figure>`).join("");
+      saring.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === kelasGaleri));
+    };
+    saring.innerHTML = ["", ...KONDISI.map((k) => k.nama)].map((k) => {
+      const n = GALERI.filter((f) => !k || f.kelas === k).length;
+      return `<button type="button" data-k="${k}">${k ? `<i class="titik" style="background:${INFO[k].warna}"></i>${k}` : "Semua"} <small>${n}</small></button>`;
+    }).join("");
+    saring.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { kelasGaleri = b.dataset.k; gambarGaleri(); } });
+    galeri.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-i]"); if (!b) return;
+      const f = GALERI[b.dataset.i], d = document.getElementById("kotakFoto");
+      document.getElementById("fotoBesar").src = f.gambar;
+      document.getElementById("fotoBesar").alt = `Jalan kondisi ${f.kelas.toLowerCase()}, ${f.lokasi}`;
+      document.getElementById("ketFotoBesar").innerHTML = `${ketFoto(f)}<br><small class="kredit-foto">${kreditFoto(f)}</small>`;
+      d.showModal();
+    });
+    document.getElementById("kotakFoto").addEventListener("click", (e) => { if (e.target.id === "kotakFoto") e.target.close(); });
+    gambarGaleri();
+
+    // sebelum dan sesudah pemeliharaan (foto resmi DBMPR), dengan kondisi survei di titik yang sama
+    const tglId = (t) => new Date(t + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const ketPml = (p) => `<strong>${esc(p.ruas)}</strong> · ${esc(p.kab)}, ${esc(p.lokasi)}`;
+    const survei = (p) => p.survei
+      ? `Survei Roadroid Jan 2021 di titik ini: <span class="chip" style="background:${INFO[p.survei.kondisi].warna};color:${INFO[p.survei.kondisi].teks}">${p.survei.kondisi}</span> IRI ${fmt(p.survei.iri, 1)} m/km`
+      : "Tidak ada segmen survei dalam radius 200 m.";
+    document.getElementById("galeriPml").innerHTML = FOTO_PEMELIHARAAN.map((p, i) => `
+      <figure class="kartu-pml">
+        <div class="pasang-foto">
+          ${[["sebelum", "Sebelum", 0], ["sesudah", "Sesudah", 1]].map(([k, label, j]) => `
+            <button type="button" data-pml="${i}" data-k="${k}" aria-label="Perbesar foto ${label.toLowerCase()} perbaikan, ${esc(p.ruas)}">
+              <img src="${p[k]}" alt="${label} perbaikan, ${esc(p.ruas)}" loading="lazy"><span class="label-foto">${label}</span></button>`).join("")}
+        </div>
+        <figcaption>
+          <p>${ketPml(p)}</p>
+          <p class="meta-pml">UPTD ${p.uptd} · ${esc(p.pekerjaan)} · ${tglId(p.tanggal)}</p>
+          <p class="survei-pml">${survei(p)}</p>
+        </figcaption>
+      </figure>`).join("");
+    document.getElementById("galeriPml").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-pml]"); if (!b) return;
+      const p = FOTO_PEMELIHARAAN[b.dataset.pml], j = b.dataset.k === "sebelum" ? 0 : 1;
+      document.getElementById("fotoBesar").src = p[b.dataset.k];
+      document.getElementById("fotoBesar").alt = `${j ? "Sesudah" : "Sebelum"} perbaikan, ${p.ruas}`;
+      document.getElementById("ketFotoBesar").innerHTML = `<span class="chip chip-pml">${j ? "Sesudah" : "Sebelum"}</span> ${ketPml(p)}<br>` +
+        `<small class="kredit-foto">${tglId(p.tanggal)} · Dokumentasi pemeliharaan DBMPR Jawa Barat (Temanjabar) · <a href="${p.asli[j]}" target="_blank" rel="noopener">Foto asli</a></small>`;
+      document.getElementById("kotakFoto").showModal();
+    });
 
     // angka ringkas langsung dari database
     (async () => {

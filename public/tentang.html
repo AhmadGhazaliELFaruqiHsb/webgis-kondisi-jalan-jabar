@@ -105,6 +105,7 @@
   </footer>
 
   <script src="js/konfigurasi.js"></script>
+  <script src="js/foto_pemeliharaan.js"></script>
   <script src="js/situs.js"></script>
   <script>
     "use strict";
@@ -120,7 +121,10 @@
       ["Pembanding validasi: panjang jalan provinsi per Kab/Kota, 2019", "BPS Provinsi Jawa Barat", a("https://jabar.bps.go.id/id/statistics-table/3/U0VOeFZEZFNiVnByUkdGMlNrOTFVVGRHY1ZkVGR6MDkjMw==/length-of-roads-by-regency-municipality-and-level-of-government-authority-in-jawa-barat-province--km---2019.html?year=2019", "Tabel BPS")],
       ["Pembanding validasi: IRI per segmen resmi DBMPR", "Temanjabar, layer 6_rj_prov_skj", a(WFS("6_rj_prov_skj"), "Data layer")],
       ["Pembanding validasi: survei visual 29 ruas Sukabumi", "Temanjabar, layer 1_rj_prov_kemantapan", a(WFS("1_rj_prov_kemantapan"), "Data layer")],
-      ["Foto contoh kelas kondisi", "Wikimedia Commons (CC BY / CC BY-SA)", KONDISI.map((k) => a(k.foto.url, k.nama)).join("<br>")],
+      [`Foto sebelum dan sesudah pemeliharaan (${FOTO_PEMELIHARAAN.length} pekerjaan tambal sulam)`, "Dokumentasi pemeliharaan DBMPR Jawa Barat, Temanjabar, layer pemeliharaan (kolom foto_awal dan foto_akhir)", a(WFS("pemeliharaan"), "Data layer")],
+      ["Foto per tahun di Peta (tombol Foto per tahun pada pop-up segmen)", "Diambil langsung saat diklik: Temanjabar layer pemeliharaan (2021–2023) dan foto bertanda lokasi Wikimedia Commons; tahun lain lewat Google Street View",
+        a(WFS("pemeliharaan"), "Layer pemeliharaan") + "<br>" + a("https://commons.wikimedia.org/wiki/Special:Nearby", "Commons sekitar lokasi")],
+      [`Foto contoh kelas kondisi dan galeri (${GALERI.length} foto)`, "Wikimedia Commons (CC BY / CC BY-SA)", GALERI.map((f) => a(f.url, `${f.kelas}: ${esc(f.lokasi)} (${esc(f.oleh)})`)).join("<br>")],
       ["Portal dan layanan peta", "Temanjabar dan GeoServer DBMPR Jawa Barat",
         a("https://temanjabar.net", "Temanjabar") + "<br>" + a("https://geo.temanjabar.net/geoserver/ows?service=WFS&version=1.0.0&request=GetCapabilities", "Daftar layer WFS")],
     ];
