@@ -15,7 +15,7 @@ SIKOJAB berupa website dengan menu navigasi yang sama di semua halaman:
 | Beranda | `/` (`index.html`) | Pengantar, angka utama langsung dari database, fitur, kelas kondisi, sumber data |
 | Dashboard | `/dashboard` | Angka kunci, komposisi kondisi, tren kemantapan 2018–2025, peringkat Kab/Kota, 10 ruas IRI tertinggi, ringkasan validasi; bisa difilter per Kab/Kota |
 | Peta | `/peta` | Mapping spasial: peta interaktif dengan panel Peta, Analisis, dan Ruas. Bisa dibuka langsung ke ruas (`/peta?ruas=348000`) atau wilayah (`/peta?kab=KOTA%20BANDUNG`) |
-| Validasi | `/validasi` | Hasil 19 pemeriksaan otomatis dan grafik Roadroid vs Galura |
+| Validasi | `/validasi` | Hasil 23 pemeriksaan otomatis dan grafik Roadroid vs Galura |
 | Tentang | `/tentang` | Data, metode pengolahan, teknologi, dan tim |
 
 Tema terang/gelap dapat diganti dari tombol di kepala halaman dan diingat oleh peramban.
@@ -31,7 +31,7 @@ Tema terang/gelap dapat diganti dari tombol di kepala halaman dan diingat oleh p
 - Detail ruas: komposisi kondisi dan grafik profil IRI sepanjang ruas (Chart.js)
 - Analisis: tren kemantapan 2018–2025, 8 ruas dengan IRI tertinggi, dan peringkat Kabupaten/Kota
 - **Kueri spasial:** cari segmen rusak dalam radius tertentu dari titik pilihan atau dari **Lokasi saya** (`ST_DWithin` pada tipe `geography`). Lingkaran radius, titik pusat, dan sorotan hasil memakai warna sian/biru yang berlawanan dengan palet data (hijau, kuning, oranye, merah)
-- **Validasi data:** 19 pemeriksaan keakuratan dan konsistensi, plus perbandingan dengan data Galura, dapat dibuka di halaman *Validasi* atau dengan `npm run validasi`
+- **Validasi data:** 23 pemeriksaan keakuratan dan konsistensi, termasuk pemeriksaan silang dengan olahan resmi DBMPR dan perbandingan dengan data Galura, dapat dibuka di halaman *Validasi* atau dengan `npm run validasi`
 - Tampilan responsif (panel samping di desktop, panel bawah di ponsel)
 
 ## Struktur folder
@@ -80,6 +80,9 @@ Leaflet, Chart.js, dan font sudah ada di `public/vendor/`, jadi tidak perlu CDN.
 | `data/batas_jabar.geojson` | Batas Provinsi Jawa Barat | Temanjabar, layer `daerah_jawa_barat` |
 | `data/kondisi_kabkota_galura.csv` | Panjang jalan per kondisi per Kab/Kota 2018–2025 | Galura Data Jabar (DBMPR) |
 | `data/olah_data.py` | Script pengolahan data (Python + GeoPandas) | — |
+| `data/pembanding_skj_dbmpr.csv` | IRI per segmen resmi DBMPR (survei Roadroid Jan 2021, 2.633 segmen), untuk validasi | Temanjabar, layer `6_rj_prov_skj` |
+| `data/pembanding_visual_dbmpr.csv` | Luas permukaan per kelas kerusakan, survei visual 29 ruas Sukabumi, untuk validasi | Temanjabar, layer `1_rj_prov_kemantapan` |
+| `data/ambil_pembanding.py` | Script pengunduh dua berkas pembanding di atas (WFS Temanjabar) | — |
 
 Klasifikasi kondisi dari IRI (m/km): Baik < 4, Sedang 4–8, Rusak Ringan 8–12, Rusak Berat ≥ 12. Jalan **mantap** = Baik + Sedang.
 
@@ -126,25 +129,28 @@ Semua endpoint bersifat `GET` dan memakai kueri berparameter.
 | `/api/terdekat?lat=&lng=&radius=&limit=&kondisi=` | Segmen dalam radius (meter) dari titik, urut terdekat. Bawaan: rusak ringan & berat |
 | `/api/tren?kab_kota=` | Tren tahunan 2018–2025 (Galura) |
 | `/api/peringkat?tahun=` | Peringkat Kab/Kota berdasarkan persen jalan mantap |
-| `/api/validasi` | Hasil 19 pemeriksaan keakuratan data dan perbandingan dengan Galura 2021 |
+| `/api/validasi` | Hasil 23 pemeriksaan keakuratan data, pemeriksaan silang DBMPR, dan perbandingan dengan Galura 2021 |
 
 Kesalahan dikembalikan sebagai `{ "galat": "pesan" }` dengan kode 400 (input salah), 404, 503 (database tidak dapat diakses), atau 500.
 
 ## Validasi keakuratan data
 
-`npm run validasi` (atau tombol *Validasi data* di web) menjalankan 19 pemeriksaan langsung pada tabel PostGIS, dalam lima kelompok:
+`npm run validasi` (atau tombol *Validasi data* di web) menjalankan 23 pemeriksaan langsung pada tabel PostGIS, dalam enam kelompok:
 
 1. **Atribut dan klasifikasi:** kelas sesuai batas IRI, rentang IRI wajar, tanpa nilai kosong atau duplikat, nama Kab/Kota cocok dengan Galura
 2. **Geometri:** geometri valid (`ST_IsValid`), segmen di dalam batas provinsi, segmen menempel pada ruas induknya, panjang nominal vs panjang terukur
 3. **Kelengkapan survei:** setiap ruas punya segmen, cakupan terhadap panjang resmi
 4. **Konsistensi antar-ukuran:** IRI ruas vs rata-rata segmen, persen mantap per titik vs per segmen
-5. **Perbandingan dengan Galura 2021:** total panjang, persen mantap provinsi, dan korelasi antar Kabupaten/Kota
+5. **Pemeriksaan silang dengan olahan resmi DBMPR:** survei Roadroid yang sama juga diolah DBMPR per segmen resminya (Temanjabar `6_rj_prov_skj`). Dibandingkan per ruas: kecocokan kode ruas, korelasi IRI, kesamaan kelas, dan persen mantap
+6. **Perbandingan dengan Galura 2021:** total panjang, persen mantap provinsi, dan korelasi antar Kabupaten/Kota
 
-Hasil pada data saat ini: 16 lulus, 1 perlu perhatian, 2 tidak sesuai.
+Hasil pada data saat ini: 20 lulus, 1 perlu perhatian, 2 tidak sesuai.
+
+- **Pemeriksaan silang DBMPR (semua lulus):** IRI rata-rata per ruas hasil olahan aplikasi berkorelasi r = 0,957 dengan olahan DBMPR (selisih median 0,06 m/km), 275 dari 297 ruas (92,6%) berkelas sama, dan persen mantap 49,2% vs 50,6%. Artinya, pengolahan data di aplikasi ini sudah benar.
 
 - **Perbaikan yang dilakukan karena validasi:** satu geometri batas provinsi tidak valid (cincin poligon rusak akibat penyederhanaan), diperbaiki dengan `ST_MakeValid` saat impor. Angka panjang per kondisi dan persen mantap di panel Ruas kini dihitung dari segmen 1 km, sama dengan peta; sebelumnya memakai klasifikasi per titik sehingga angkanya berbeda (mis. kondisi Baik 331 km per titik vs 194 km per segmen).
 - **Catatan, bukan kesalahan:** 4 segmen tampak berbeda satu kelas dari batas IRI karena nilai dibulatkan 2 desimal (kelas dihitung dari nilai sebelum dibulatkan). Panjang nominal segmen (jumlah titik × 50 m) sekitar 3,6% lebih panjang dari panjang geometri terukur.
-- **Dua pemeriksaan yang tidak sesuai:** survei Roadroid (Januari 2021) menghasilkan 49,2% jalan mantap, sedangkan Galura 2021 mencatat 82,3% (selisih −33 poin), dan korelasi antar Kabupaten/Kota hanya r = 0,29. Penyebabnya belum dapat dipastikan. Agar Roadroid menghasilkan 82% mantap, batas mantap harus berada di IRI sekitar 11, bukan 8. Kedua sumber sebaiknya dibaca terpisah, dan temuan ini layak dibahas di laporan.
+- **Dua pemeriksaan yang tidak sesuai:** survei Roadroid (Januari 2021) menghasilkan 49,2% jalan mantap, sedangkan Galura 2021 mencatat 82,3% (selisih −33 poin), dan korelasi antar Kabupaten/Kota hanya r = 0,29. Penyebabnya belum dapat dipastikan. Agar Roadroid menghasilkan 82% mantap, batas mantap harus berada di IRI sekitar 11, bukan 8. Survei visual DBMPR pada 29 ruas wilayah Sukabumi (Temanjabar `1_rj_prov_kemantapan`) menunjukkan pola yang sama: rata-rata 87% luas permukaan baik sampai sedang, sedangkan Roadroid pada ruas yang sama 58% mantap. Ini menguatkan dugaan bahwa selisih berasal dari perbedaan metode survei, bukan dari pengolahan. Kedua sumber sebaiknya dibaca terpisah, dan temuan ini layak dibahas di laporan.
 
 ## Gambar kondisi
 

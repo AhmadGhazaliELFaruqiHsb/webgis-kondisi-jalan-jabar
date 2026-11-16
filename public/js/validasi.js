@@ -1,5 +1,5 @@
 "use strict";
-// Halaman Validasi: hasil 19 pemeriksaan otomatis dari GET /api/validasi (database/validasi_data.js),
+// Halaman Validasi: hasil pemeriksaan otomatis dari GET /api/validasi (database/validasi_data.js),
 // dikelompokkan, ditambah grafik sebar Roadroid vs Galura per Kabupaten/Kota.
 
 const $ = (id) => document.getElementById(id);

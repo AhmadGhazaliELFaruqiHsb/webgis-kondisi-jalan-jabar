@@ -118,6 +118,32 @@ async function main() {
     }
     console.log(`[OK] kondisi_kabkota  : ${galura.length} baris`);
 
+    // 5. data pembanding untuk validasi (opsional: dilewati bila berkas belum ada)
+    if (fs.existsSync(path.join(DATA, "pembanding_skj_dbmpr.csv"))) {
+      const skj = bacaCSV("pembanding_skj_dbmpr.csv");
+      for (const r of skj) {
+        await db.query(
+          `INSERT INTO pembanding_skj (idsegmen, idruas, panjang_m, c_iri, e_iri, tanggal)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [r.idsegmen, r.idruas, r.panjang_m, r.c_iri, r.e_iri || null, r.tanggal || null]
+        );
+      }
+      console.log(`[OK] pembanding_skj   : ${skj.length} baris`);
+    }
+    if (fs.existsSync(path.join(DATA, "pembanding_visual_dbmpr.csv"))) {
+      const vis = bacaCSV("pembanding_visual_dbmpr.csv");
+      for (const r of vis) {
+        await db.query(
+          `INSERT INTO pembanding_visual (idruas, kab_kota, sangat_baik_m2, baik_m2, sedang_m2, jelek_m2,
+                                          parah_m2, sangat_parah_m2, hancur_m2)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [r.idruas, r.kab_kota, r.sangat_baik_m2, r.baik_m2, r.sedang_m2, r.jelek_m2,
+           r.parah_m2, r.sangat_parah_m2, r.hancur_m2]
+        );
+      }
+      console.log(`[OK] pembanding_visual: ${vis.length} baris`);
+    }
+
     await db.query("COMMIT");
 
     // pemeriksaan hasil impor

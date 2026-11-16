@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS segmen_kondisi;
 DROP TABLE IF EXISTS ruas_jalan;
 DROP TABLE IF EXISTS batas_jabar;
 DROP TABLE IF EXISTS kondisi_kabkota;
+DROP TABLE IF EXISTS pembanding_skj;
+DROP TABLE IF EXISTS pembanding_visual;
 
 -- ---------------------------------------------------------------------------
 -- 1. Ruas jalan provinsi (garis) + ringkasan kondisi hasil survei per ruas
@@ -64,6 +66,31 @@ CREATE TABLE kondisi_kabkota (
     kondisi_jalan         varchar(14)  NOT NULL CHECK (kondisi_jalan IN ('BAIK','SEDANG','RUSAK RINGAN','RUSAK BERAT')),
     panjang_km            numeric(8,2) NOT NULL,
     tahun                 smallint     NOT NULL
+);
+
+-- ---------------------------------------------------------------------------
+-- 5. Data pembanding untuk validasi (Temanjabar DBMPR, lihat data/ambil_pembanding.py)
+--    pembanding_skj    : IRI per segmen menurut segmentasi resmi DBMPR (layer 6_rj_prov_skj)
+--    pembanding_visual : luas permukaan per kelas kerusakan, survei visual (layer 1_rj_prov_kemantapan)
+-- ---------------------------------------------------------------------------
+CREATE TABLE pembanding_skj (
+    idsegmen   varchar(20)  PRIMARY KEY,
+    idruas     varchar(12)  NOT NULL,
+    panjang_m  numeric(10,2) NOT NULL,
+    c_iri      numeric(7,4) NOT NULL,
+    e_iri      numeric(7,4),
+    tanggal    date
+);
+CREATE TABLE pembanding_visual (
+    idruas            varchar(12) PRIMARY KEY,
+    kab_kota          text,
+    sangat_baik_m2    numeric(12,2) NOT NULL DEFAULT 0,
+    baik_m2           numeric(12,2) NOT NULL DEFAULT 0,
+    sedang_m2         numeric(12,2) NOT NULL DEFAULT 0,
+    jelek_m2          numeric(12,2) NOT NULL DEFAULT 0,
+    parah_m2          numeric(12,2) NOT NULL DEFAULT 0,
+    sangat_parah_m2   numeric(12,2) NOT NULL DEFAULT 0,
+    hancur_m2         numeric(12,2) NOT NULL DEFAULT 0
 );
 
 -- ---------------------------------------------------------------------------

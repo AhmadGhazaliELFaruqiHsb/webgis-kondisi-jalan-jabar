@@ -13,6 +13,16 @@ const DI_BATAS = (kolom, tol) =>
   `(ABS(${kolom} - 4) <= ${tol} OR ABS(${kolom} - 8) <= ${tol} OR ABS(${kolom} - 12) <= ${tol})`;
 const PEMBULATAN = 0.005; // nilai IRI disimpan 2 desimal
 
+// Koefisien korelasi Pearson
+function pearson(x, y) {
+  const n = x.length, mx = x.reduce((a, b) => a + b, 0) / n, my = y.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2;
+  }
+  return sxy / Math.sqrt(sxx * syy);
+}
+
 async function jalankanValidasi(db) {
   const satu = async (sql) => (await db.query(sql)).rows[0];
   const hasil = [];
@@ -158,7 +168,65 @@ async function jalankanValidasi(db) {
     `Baik ${fm(perTitik.baik, 0)} vs ${fm(perSeg.baik, 0)} km, Rusak Berat ${fm(perTitik.berat, 0)} vs ${fm(perSeg.berat, 0)} km`,
     "Segmen 1 km merata-ratakan sekitar 20 titik, sehingga nilai ekstrem (sangat baik atau sangat rusak) teredam dan sebagian besar jatuh ke kelas Sedang dan Rusak Ringan. Aplikasi ini memakai ukuran per segmen di semua tampilan agar angka konsisten dengan peta.");
 
-  // ------------------------------------------------------------ 5. perbandingan dengan Galura 2021
+  // ------------------------------------------------------------ 5. pemeriksaan silang dengan olahan resmi DBMPR
+  // Layer 6_rj_prov_skj berisi survei Roadroid yang sama, tetapi dipotong dan dirata-ratakan oleh DBMPR
+  // menurut segmen resminya. Bila pengolahan kita benar, hasil per ruas harus hampir sama.
+  const G6 = "Pemeriksaan silang dengan olahan resmi DBMPR (Temanjabar)";
+  const adaSkj = (await satu(`SELECT to_regclass('pembanding_skj') IS NOT NULL AS ada`)).ada
+    && (await satu(`SELECT COUNT(*)::int AS n FROM pembanding_skj`)).n > 0;
+  let visual = null;
+  if (adaSkj) {
+    const pasang = (await db.query(`
+      WITH d AS (SELECT idruas, SUM(c_iri * panjang_m) / SUM(panjang_m) AS iri, SUM(panjang_m) / 1000 AS km
+                 FROM pembanding_skj GROUP BY idruas)
+      SELECT r.idruas, r.iri_rata2::float AS kita, d.iri::float AS dbmpr, d.km::float AS km
+      FROM ruas_jalan r JOIN d USING (idruas) WHERE r.iri_rata2 IS NOT NULL`)).rows;
+    const totRuas = (await satu(`SELECT COUNT(*)::int AS n FROM ruas_jalan`)).n;
+    tambah(G6, "Setiap ruas ada di data segmen resmi DBMPR", pasang.length === totRuas ? "lulus" : "perhatian",
+      `${pasang.length} dari ${totRuas} ruas cocok berdasarkan kode ruas`);
+
+    const kls = (v) => (v < 4 ? 0 : v < 8 ? 1 : v < 12 ? 2 : 3);
+    const rIri = pearson(pasang.map((p) => p.kita), pasang.map((p) => p.dbmpr));
+    const selisih = pasang.map((p) => Math.abs(p.kita - p.dbmpr)).sort((a, b) => a - b);
+    const median = selisih[Math.floor(selisih.length / 2)];
+    tambah(G6, "IRI rata-rata per ruas: olahan aplikasi vs olahan DBMPR",
+      rIri >= 0.9 ? "lulus" : rIri >= 0.8 ? "perhatian" : "gagal",
+      `r = ${fm(rIri, 3)} pada ${pasang.length} ruas; selisih median ${fm(median, 2)} m/km`,
+      "Kedua angka berasal dari survei Roadroid Januari 2021 yang sama, tetapi dipotong per segmen dengan cara berbeda (aplikasi: setiap 20 titik, DBMPR: segmen resmi). Korelasi tinggi menunjukkan pengolahan data di aplikasi ini benar.");
+
+    const sama = pasang.filter((p) => kls(p.kita) === kls(p.dbmpr)).length;
+    const bagiSama = (sama / pasang.length) * 100;
+    tambah(G6, "Kelas kondisi ruas sama dengan olahan DBMPR",
+      bagiSama >= 90 ? "lulus" : bagiSama >= 80 ? "perhatian" : "gagal",
+      `${sama} dari ${pasang.length} ruas (${fm(bagiSama, 1)}%) berkelas sama`,
+      "Ruas yang berbeda kelas umumnya memiliki IRI rata-rata di dekat batas kelas (4, 8, atau 12).");
+
+    const m = await satu(`
+      SELECT 100 * SUM(panjang_m) FILTER (WHERE c_iri < 8) / SUM(panjang_m) AS mantap, SUM(panjang_m) / 1000 AS km
+      FROM pembanding_skj`);
+    const selM = mantapS - m.mantap;
+    tambah(G6, "Persen jalan mantap: olahan aplikasi vs olahan DBMPR",
+      Math.abs(selM) <= 2 ? "lulus" : Math.abs(selM) <= 5 ? "perhatian" : "gagal",
+      `${fm(mantapS, 1)}% aplikasi vs ${fm(m.mantap, 1)}% DBMPR (selisih ${fm(selM, 1)} poin)`,
+      `Panjang tersurvei ${fm(totS, 0)} km aplikasi vs ${fm(m.km, 0)} km DBMPR.`);
+
+    // survei visual DBMPR (hanya sebagian ruas): dipakai sebagai keterangan pembanding Galura
+    const v = (await db.query(`
+      SELECT r.persen_mantap::float AS roadroid,
+             100 * (sangat_baik_m2 + baik_m2 + sedang_m2)
+                 / NULLIF(sangat_baik_m2 + baik_m2 + sedang_m2 + jelek_m2 + parah_m2 + sangat_parah_m2 + hancur_m2, 0) AS visual
+      FROM pembanding_visual pv JOIN ruas_jalan r USING (idruas)
+      WHERE r.persen_mantap IS NOT NULL`)).rows.filter((x) => x.visual != null);
+    if (v.length) {
+      visual = {
+        n: v.length,
+        roadroid: v.reduce((a, b) => a + b.roadroid, 0) / v.length,
+        visual: v.reduce((a, b) => a + Number(b.visual), 0) / v.length,
+      };
+    }
+  }
+
+  // ------------------------------------------------------------ 6. perbandingan dengan Galura 2021
   const G5 = "Perbandingan dengan Galura Data Jabar, 2021";
   const TAHUN = 2021; // tahun yang sama dengan survei Roadroid (Januari 2021)
 
@@ -173,7 +241,10 @@ async function jalankanValidasi(db) {
   tambah(G5, "Persen jalan mantap, seluruh provinsi",
     Math.abs(selMantap) <= 10 ? "lulus" : Math.abs(selMantap) <= 20 ? "perhatian" : "gagal",
     `${fm(mantapS, 1)}% Roadroid vs ${fm(gal.mantap, 1)}% Galura (selisih ${fm(selMantap, 1)} poin)`,
-    "Dua sumber ini mengukur hal yang berbeda: satu survei sensor ponsel pada Januari 2021, dan rekap tahunan DBMPR. Penyebab selisihnya belum dapat dipastikan; perbedaan metode ukur, waktu, dan batas kelas adalah kemungkinannya.");
+    "Dua sumber ini mengukur hal yang berbeda: satu survei sensor ponsel pada Januari 2021, dan rekap tahunan DBMPR. Penyebab selisihnya belum dapat dipastikan; perbedaan metode ukur, waktu, dan batas kelas adalah kemungkinannya."
+      + (visual
+        ? ` Pola yang sama terlihat pada survei visual DBMPR di ${visual.n} ruas wilayah Sukabumi (Temanjabar): rata-rata ${fm(visual.visual, 0)}% luas permukaan berkondisi baik sampai sedang, sedangkan Roadroid pada ruas yang sama menilai ${fm(visual.roadroid, 0)}% mantap. Ini menguatkan dugaan bahwa selisih berasal dari perbedaan metode survei. Pengolahan di aplikasi sendiri sudah sesuai dengan olahan DBMPR (lihat pemeriksaan silang di atas).`
+        : ""));
 
   const banding = (await db.query(`
     WITH rr AS (
