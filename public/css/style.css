@@ -593,6 +593,3 @@ input::placeholder { color: var(--placeholder); }
 }
 
 /* jalan non-provinsi (rujukan abu-abu) */
-.ket-lap { display: block; margin-left: 26px; color: var(--redup); font-size: 12px; }
-.legenda .leg-lain { display: flex; align-items: center; gap: 9px; margin-top: 4px; font-size: 13px; color: var(--teks); }
-.legenda .leg-lain i { width: 24px; height: 4px; border-radius: 3px; background: #7B8794; flex: none; }

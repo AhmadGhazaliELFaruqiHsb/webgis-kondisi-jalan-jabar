@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS batas_jabar;
 DROP TABLE IF EXISTS kondisi_kabkota;
 DROP TABLE IF EXISTS pembanding_skj;
 DROP TABLE IF EXISTS pembanding_visual;
+DROP TABLE IF EXISTS pembanding_bps;
 
 -- ---------------------------------------------------------------------------
 -- 1. Ruas jalan provinsi (garis) + ringkasan kondisi hasil survei per ruas
@@ -91,6 +92,18 @@ CREATE TABLE pembanding_visual (
     parah_m2          numeric(12,2) NOT NULL DEFAULT 0,
     sangat_parah_m2   numeric(12,2) NOT NULL DEFAULT 0,
     hancur_m2         numeric(12,2) NOT NULL DEFAULT 0
+);
+
+-- ---------------------------------------------------------------------------
+-- 6. Statistik resmi BPS: panjang jalan menurut Kab/Kota dan kewenangan, 2019
+--    (data/panjang_jalan_bps_2019.csv, jabar.bps.go.id). Angka dibulatkan ke km.
+-- ---------------------------------------------------------------------------
+CREATE TABLE pembanding_bps (
+    kab_kota      text PRIMARY KEY,          -- format sama dengan ruas_jalan.kab_kota
+    km_negara     numeric(8,1),
+    km_provinsi   numeric(8,1) NOT NULL,
+    km_kabkota    numeric(8,1),
+    tahun         smallint NOT NULL
 );
 
 -- ---------------------------------------------------------------------------

@@ -16,10 +16,8 @@ const Peta = (() => {
   let rSegmen = null;
   let aksiKlikTitik = null;
   let kembali = { pilihRuas() {}, detail() {} };
-  const visibel = { segmen: true, ruas: false, batas: true, nasional: true, kabkota: false };
+  const visibel = { segmen: true, ruas: false, batas: true };
   // jalan non-provinsi (abu-abu, tanpa data kondisi): dimuat dari berkas statis public/data saat pertama dinyalakan
-  const grupLain = { nasional: L.layerGroup(), kabkota: L.layerGroup() };
-  const sudahMuat = { nasional: false, kabkota: false };
 
   const tebal = (z) => (z <= 7 ? 1.8 : z <= 8 ? 2.2 : z <= 9 ? 2.8 : z <= 10 ? 3.4 : z <= 11 ? 4.2 : z <= 12 ? 5 : 6.5);
   const tebalSekarang = () => tebal(map.getZoom());
@@ -92,11 +90,9 @@ const Peta = (() => {
     const ikonDetail = {
       lapSegmen: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 26 L16 18 L28 20 L44 6" stroke="#2E9E4F" stroke-width="4" fill="none"/><path d="M16 18 L28 20" stroke="#F2B705" stroke-width="4"/><path d="M28 20 L36 13" stroke="#F08A24" stroke-width="4"/><path d="M36 13 L44 6" stroke="#D63A2F" stroke-width="4"/></svg>',
       lapRuas: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 8 C14 10 18 24 28 22 S40 10 44 12" stroke="#F08A24" stroke-width="5" fill="none" stroke-linecap="round"/></svg>',
-      lapNasional: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M2 24 C14 22 20 8 46 8" stroke="#7B8794" stroke-width="4" fill="none"/><path d="M2 30 L46 18" stroke="#4A5562" stroke-width="3" stroke-dasharray="6 3" fill="none"/></svg>',
-      lapKabkota: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 6 L20 14 L18 28 M20 14 L44 10 M30 12 L34 30 M8 22 L18 20" stroke="#9AA4AF" stroke-width="1.6" fill="none"/></svg>',
       lapBatas: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M6 6 L30 4 L42 14 L38 28 L12 26 Z" stroke="#5F6B78" stroke-width="2" stroke-dasharray="4 3" fill="none"/></svg>',
     };
-    const NAMA_DETAIL = { lapSegmen: "Segmen kondisi", lapRuas: "Ruas rata-rata", lapNasional: "Jalan nasional & tol", lapKabkota: "Jalan kab/kota", lapBatas: "Batas provinsi" };
+    const NAMA_DETAIL = { lapSegmen: "Segmen kondisi", lapRuas: "Ruas rata-rata", lapBatas: "Batas provinsi" };
     const ctrlLapisan = L.control({ position: "bottomleft" });
     ctrlLapisan.onAdd = () => {
       const d = L.DomUtil.create("div", "kontrol-lapisan");
@@ -152,7 +148,7 @@ const Peta = (() => {
     L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
 
     // urutan tumpukan: batas < ruas < bayangan < sorotan < segmen < hasil pencarian titik
-    [["batas", 350], ["lain", 360], ["ruas", 380], ["bayang", 400], ["sorot", 405], ["segmen", 410], ["hasil", 420]].forEach(([n, z]) => {
+    [["batas", 350], ["ruas", 380], ["bayang", 400], ["sorot", 405], ["segmen", 410], ["hasil", 420]].forEach(([n, z]) => {
       map.createPane(n).style.zIndex = z;
     });
 
@@ -169,8 +165,7 @@ const Peta = (() => {
       const d = L.DomUtil.create("div", "legenda");
       d.innerHTML = `<h4 role="button" tabindex="0" aria-expanded="true" title="Klik untuk menyembunyikan atau menampilkan">Kondisi jalan</h4><ul>${KONDISI.map((k) =>
         `<li><i style="background:${k.warna}"></i>${k.nama}<span>${k.rentang.replace("IRI ", "")}</span></li>`).join("")}</ul>
-        <p class="leg-lain"><i></i>Jalan lain (tanpa data kondisi)</p>
-        <p>Hanya jalan provinsi (297 ruas) yang dinilai. IRI dalam m/km, survei Roadroid Jan 2021</p>`;
+        <p>Hanya jalan provinsi (297 ruas) yang diberi warna. IRI dalam m/km, survei Roadroid Jan 2021</p>`;
       L.DomEvent.disableClickPropagation(d);
       const judulLegenda = d.querySelector("h4");
       const alih = (tutup) => { d.classList.toggle("tutup", tutup); judulLegenda.setAttribute("aria-expanded", String(!tutup)); };
@@ -280,37 +275,10 @@ const Peta = (() => {
 
   function atur(nama, nyala) {
     visibel[nama] = nyala;
-    if (nama in grupLain) return aturLain(nama, nyala);
     const grup = { segmen: grupSegmen, ruas: grupRuas, batas: lapBatas }[nama];
     if (!grup) return;
     if (nyala) grup.addTo(map); else map.removeLayer(grup);
     if (nama === "ruas" && nyala) grupRuas.eachLayer((l) => l.bringToBack && l.bringToBack());
-  }
-
-  // Jalan nasional, tol, dan kab/kota: hanya rujukan visual. Data kondisinya bukan bagian dari survei SIKOJAB.
-  const GAYA_LAIN = {
-    nasional: { color: "#7B8794", weight: 3, opacity: 0.85 },
-    tol: { color: "#4A5562", weight: 3, opacity: 0.9, dashArray: "8 5" },
-    kabkota: { color: "#9AA4AF", weight: 1.2, opacity: 0.7 },
-  };
-  const NAMA_LAIN = { nasional: "Jalan nasional", tol: "Jalan tol", kabkota: "Jalan kabupaten/kota" };
-  async function muatLain(jenis) {
-    const rLain = L.canvas({ pane: "lain", padding: 0.4, tolerance: 4 });
-    for (const sub of jenis === "nasional" ? ["nasional", "tol"] : ["kabkota"]) {
-      const data = await fetch(`data/jalan_${sub}.geojson`).then((r) => { if (!r.ok) throw new Error(`Data ${NAMA_LAIN[sub]} belum tersedia.`); return r.json(); });
-      grupLain[jenis].addLayer(L.geoJSON(data, {
-        pane: "lain", renderer: rLain, style: () => GAYA_LAIN[sub],
-        onEachFeature: (f, l) => l.bindTooltip(`<strong>${esc(f.properties.nama || NAMA_LAIN[sub])}</strong><br>${NAMA_LAIN[sub]}, tidak termasuk data kondisi SIKOJAB`,
-          { sticky: true, className: "tip", opacity: 1 }),
-      }));
-    }
-    sudahMuat[jenis] = true;
-  }
-  async function aturLain(jenis, nyala) {
-    visibel[jenis] = nyala;
-    if (!nyala) { map.removeLayer(grupLain[jenis]); return; }
-    if (!sudahMuat[jenis]) await muatLain(jenis);
-    if (visibel[jenis]) grupLain[jenis].addTo(map);
   }
 
   const bukaPopupSegmen = (latlng, props, arah = 0) =>

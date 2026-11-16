@@ -633,10 +633,6 @@ function pasangUI() {
   // lapisan
   $("lapSegmen").addEventListener("change", (e) => Peta.atur("segmen", e.target.checked));
   $("lapBatas").addEventListener("change", (e) => Peta.atur("batas", e.target.checked));
-  // jalan non-provinsi sebagai rujukan (abu-abu); berkasnya dimuat saat pertama dinyalakan
-  for (const [id, jenis] of [["lapNasional", "nasional"], ["lapKabkota", "kabkota"]]) {
-    $(id).addEventListener("change", (e) => Promise.resolve(Peta.atur(jenis, e.target.checked)).catch((err) => pesan(err.message, 6000)));
-  }
   $("lapRuas").addEventListener("change", (e) => {
     S.lapisanRuas = e.target.checked;
     Peta.atur("ruas", e.target.checked);
@@ -696,7 +692,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("selTahun").innerHTML = tahun.map((t) => `<option value="${t}">${t}</option>`).join("");
 
     S.batasJabar = await Peta.muatBatas();
-    Promise.resolve(Peta.atur("nasional", $("lapNasional").checked)).catch((err) => pesan(err.message, 6000));
     Peta.zoomBatas(S.batasJabar);
     await Promise.all([muatRingkasan(), muatPeta()]);
     panaskanLokasi();

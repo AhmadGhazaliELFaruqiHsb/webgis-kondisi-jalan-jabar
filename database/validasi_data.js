@@ -164,7 +164,8 @@ async function jalankanValidasi(db) {
   const mantapS = ((perSeg.baik + perSeg.sedang) / totS) * 100;
   tambah(G4, "Persen jalan mantap: per titik vs per segmen", Math.abs(mantapT - mantapS) <= 2 ? "lulus" : "perhatian",
     `${fm(mantapT, 1)}% per titik, ${fm(mantapS, 1)}% per segmen`);
-  tambah(G4, "Panjang per kondisi: per titik vs per segmen", "perhatian",
+  // catatan metode, bukan uji: selisih ini memang pasti muncul karena segmen merata-ratakan titik
+  tambah(G4, "Panjang per kondisi: per titik vs per segmen", "info",
     `Baik ${fm(perTitik.baik, 0)} vs ${fm(perSeg.baik, 0)} km, Rusak Berat ${fm(perTitik.berat, 0)} vs ${fm(perSeg.berat, 0)} km`,
     "Segmen 1 km merata-ratakan sekitar 20 titik, sehingga nilai ekstrem (sangat baik atau sangat rusak) teredam dan sebagian besar jatuh ke kelas Sedang dan Rusak Ringan. Aplikasi ini memakai ukuran per segmen di semua tampilan agar angka konsisten dengan peta.");
 
@@ -226,7 +227,46 @@ async function jalankanValidasi(db) {
     }
   }
 
-  // ------------------------------------------------------------ 6. perbandingan dengan Galura 2021
+  // ------------------------------------------------------------ 6. pemeriksaan silang dengan statistik BPS
+  // BPS mencatat panjang jalan provinsi per Kab/Kota (2019). Sumber ini terpisah dari DBMPR dan Galura,
+  // jadi cocok untuk menguji apakah daftar ruas dan panjangnya di aplikasi sudah lengkap.
+  const G7 = "Pemeriksaan silang dengan statistik resmi BPS, 2019";
+  const adaBps = (await satu(`SELECT to_regclass('pembanding_bps') IS NOT NULL AS ada`)).ada
+    && (await satu(`SELECT COUNT(*)::int AS n FROM pembanding_bps`)).n > 0;
+  if (adaBps) {
+    const bps = (await db.query(`
+      WITH k AS (SELECT kab_kota, SUM(panjang_km) AS km FROM ruas_jalan GROUP BY kab_kota)
+      SELECT b.kab_kota, b.km_provinsi::float AS bps, k.km::float AS kita
+      FROM pembanding_bps b LEFT JOIN k USING (kab_kota) ORDER BY b.kab_kota`)).rows;
+    const cocok = bps.filter((b) => b.kita != null);
+    const wilKita = (await satu(`SELECT COUNT(DISTINCT kab_kota)::int AS n FROM ruas_jalan`)).n;
+    tambah(G7, "Kabupaten/Kota sama dengan daftar BPS", cocok.length === bps.length && wilKita === bps.length ? "lulus" : "gagal",
+      `${cocok.length} dari ${bps.length} wilayah BPS ada di data ruas`);
+
+    const tBps = bps.reduce((a, b) => a + b.bps, 0), tKita = cocok.reduce((a, b) => a + b.kita, 0);
+    const selT = ((tKita - tBps) / tBps) * 100;
+    tambah(G7, "Total panjang jalan provinsi: data ruas vs BPS",
+      Math.abs(selT) <= 1 ? "lulus" : Math.abs(selT) <= 3 ? "perhatian" : "gagal",
+      `${fm(tKita, 1)} km aplikasi vs ${fm(tBps, 0)} km BPS (${fm(selT, 2)}%)`,
+      "Angka BPS dibulatkan ke kilometer, sehingga selisih kecil wajar.");
+
+    const rB = pearson(cocok.map((b) => b.bps), cocok.map((b) => b.kita));
+    const beda = cocok.filter((b) => Math.abs(b.kita - b.bps) > 1)
+      .sort((a, b) => Math.abs(b.kita - b.bps) - Math.abs(a.kita - a.bps));
+    const nama = (s) => s.replace("KABUPATEN ", "Kab. ").replace("KOTA ", "Kota ")
+      .toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+    tambah(G7, "Panjang jalan provinsi per Kabupaten/Kota: data ruas vs BPS",
+      rB >= 0.98 ? "lulus" : rB >= 0.9 ? "perhatian" : "gagal",
+      `r = ${fm(rB, 3)}; ${cocok.length - beda.length} dari ${cocok.length} wilayah selisih paling banyak 1 km`,
+      beda.length
+        ? `Wilayah yang berbeda: ${beda.map((b) => `${nama(b.kab_kota)} ${b.kita > b.bps ? "+" : "−"}${fm(Math.abs(b.kita - b.bps), 1)} km`).join(", ")}.` +
+          (Math.abs(beda.reduce((a, b) => a + b.kita - b.bps, 0)) <= 0.5 * beda.length // toleransi pembulatan BPS
+            ? " Selisihnya saling menutup antara wilayah bertetangga, jadi totalnya tetap sama: ruas yang melintasi batas wilayah dicatat di Kab/Kota yang berbeda, bukan ruas yang hilang."
+            : "")
+        : "");
+  }
+
+  // ------------------------------------------------------------ 7. perbandingan dengan Galura 2021
   const G5 = "Perbandingan dengan Galura Data Jabar, 2021";
   const TAHUN = 2021; // tahun yang sama dengan survei Roadroid (Januari 2021)
 
@@ -277,12 +317,20 @@ async function jalankanValidasi(db) {
   //               dari survei yang sama)
   //  pembanding : membandingkan dengan sumber lain yang memakai metode survei berbeda (Galura); selisih di sini
   //               menunjukkan perbedaan metode, bukan kesalahan data
-  for (const h of hasil) h.jenis = h.kelompok === G5 ? "pembanding" : "kebenaran";
+  //  Pada perbandingan, hasil yang tidak sesuai ditandai "berbeda" (berbeda metode), bukan "gagal":
+  //  dua survei dengan metode berbeda tidak bisa saling meluluskan atau menggagalkan.
+  //  Status "info" adalah catatan metode dan tidak dihitung sebagai pemeriksaan.
+  for (const h of hasil) {
+    h.jenis = h.kelompok === G5 ? "pembanding" : "kebenaran";
+    if (h.jenis === "pembanding" && h.status !== "lulus") h.status = "berbeda";
+  }
   const hitung = (daftar) => ({
     lulus: daftar.filter((h) => h.status === "lulus").length,
     perhatian: daftar.filter((h) => h.status === "perhatian").length,
     gagal: daftar.filter((h) => h.status === "gagal").length,
-    total: daftar.length,
+    berbeda: daftar.filter((h) => h.status === "berbeda").length,
+    info: daftar.filter((h) => h.status === "info").length,
+    total: daftar.filter((h) => h.status !== "info").length,
   });
   const ringkasan = {
     ...hitung(hasil),
@@ -304,7 +352,7 @@ if (require.main === module) {
   require("dotenv").config();
   const { Pool } = require("pg");
   const pool = new Pool();
-  const LABEL = { lulus: "LULUS    ", perhatian: "PERHATIAN", gagal: "TIDAK SESUAI" };
+  const LABEL = { lulus: "LULUS    ", perhatian: "PERHATIAN", gagal: "TIDAK SESUAI", berbeda: "BEDA METODE", info: "CATATAN  " };
   jalankanValidasi(pool)
     .then((v) => {
       console.log("\nVALIDASI DATA SIKOJAB\n=====================");
@@ -318,7 +366,8 @@ if (require.main === module) {
       const k = r.kebenaran, b = r.pembanding;
       console.log(`\nRingkasan`);
       console.log(`  Uji kebenaran data           : ${k.lulus} lulus, ${k.perhatian} perlu perhatian, ${k.gagal} tidak sesuai, dari ${k.total} pemeriksaan`);
-      console.log(`  Perbandingan dengan Galura   : ${b.lulus} dari ${b.total} sesuai (metode survei berbeda)`);
+      console.log(`  Perbandingan dengan Galura   : ${b.lulus} sesuai, ${b.berbeda} berbeda metode, dari ${b.total} perbandingan`);
+      if (k.info) console.log(`  Catatan metode (tidak dihitung): ${k.info}`);
       console.log(`\nPerbandingan per Kabupaten/Kota (persen jalan mantap, ${v.banding.tahun}):`);
       console.log("  Kabupaten/Kota".padEnd(30) + "Roadroid".padStart(10) + "Galura".padStart(10) + "Selisih".padStart(10));
       for (const b of v.banding.per_kabkota) {

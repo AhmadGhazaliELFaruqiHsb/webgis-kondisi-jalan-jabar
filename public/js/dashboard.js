@@ -120,7 +120,7 @@ async function muatValidasi() {
     const k = v.ringkasan.kebenaran || v.ringkasan, b = v.ringkasan.pembanding;
     $("dValidasi").innerHTML = `
       <div><strong>${k.lulus}<small> / ${k.total}</small></strong><span>uji kebenaran data lulus${k.perhatian ? `, ${k.perhatian} perlu perhatian` : ""}${k.gagal ? `, ${k.gagal} tidak sesuai` : ""}</span></div>
-      ${b ? `<div><strong>${b.lulus}<small> / ${b.total}</small></strong><span>sesuai dengan Galura (metode survei berbeda)</span></div>` : ""}
+      ${b ? `<div><strong>${b.lulus}<small> / ${b.total}</small></strong><span>sesuai dengan Galura${b.berbeda ? `, ${b.berbeda} berbeda metode survei` : ""}</span></div>` : ""}
       <a class="tombol" href="validasi.html">Lihat rincian validasi →</a>`;
   } catch (e) { $("dValidasi").textContent = e.message; }
 }

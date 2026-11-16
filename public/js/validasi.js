@@ -4,34 +4,37 @@
 
 const $ = (id) => document.getElementById(id);
 
-const LABEL_STATUS = { lulus: "Lulus", perhatian: "Perhatian", gagal: "Tidak sesuai" };
-const WARNA_STATUS = { lulus: ["#2E9E4F", "#1E2329"], perhatian: ["#F2B705", "#1E2329"], gagal: ["#D63A2F", "#FFFFFF"] };
+const LABEL_STATUS = { lulus: "Lulus", perhatian: "Perhatian", gagal: "Tidak sesuai", berbeda: "Berbeda metode", info: "Catatan metode" };
+const WARNA_STATUS = { lulus: ["#2E9E4F", "#1E2329"], perhatian: ["#F2B705", "#1E2329"], gagal: ["#D63A2F", "#FFFFFF"],
+  berbeda: ["#2F6FDE", "#FFFFFF"], info: ["#BFD7F5", "#1E2329"] };
 
 function gambarValidasi(v) {
   const r = v.ringkasan;
   const kelompok = [...new Set(v.pemeriksaan.map((p) => p.kelompok))];
-  const chip = (s) => `<span class="chip" style="background:${WARNA_STATUS[s][0]};color:${WARNA_STATUS[s][1]}">${LABEL_STATUS[s]}</span>`;
-  const k = r.kebenaran || r, b = r.pembanding || { lulus: 0, total: 0 };
+  // pada perbandingan, hasil yang cocok disebut "Sesuai" (bukan uji lulus/gagal)
+  const chip = (s, j) => `<span class="chip" style="background:${WARNA_STATUS[s][0]};color:${WARNA_STATUS[s][1]}">${s === "lulus" && j === "pembanding" ? "Sesuai" : LABEL_STATUS[s]}</span>`;
+  const k = r.kebenaran || r, b = r.pembanding || { lulus: 0, berbeda: 0, total: 0 };
   const jenisKelompok = (g) => v.pemeriksaan.find((p) => p.kelompok === g)?.jenis || "kebenaran";
   const judulBagian = { kebenaran: false, pembanding: false };
   $("isiValidasi").innerHTML = `
     <div class="ringkas-dua">
       <section class="kartu ringkas-jenis">
         <h2>Uji kebenaran data</h2>
-        <p class="bantu">Apakah data di aplikasi benar, lengkap, dan konsisten, termasuk dicek silang dengan olahan resmi DBMPR dari survei yang sama.</p>
+        <p class="bantu">Apakah data di aplikasi benar, lengkap, dan konsisten, termasuk dicek silang dengan olahan resmi DBMPR dari survei yang sama dan dengan statistik panjang jalan BPS.</p>
         <div class="ringkas-validasi">
           <div><strong>${k.lulus}</strong><span>lulus</span></div>
           <div><strong>${k.perhatian}</strong><span>perlu perhatian</span></div>
           <div><strong>${k.gagal}</strong><span>tidak sesuai</span></div>
-          <p>dari ${k.total} pemeriksaan.</p>
+          <p>dari ${k.total} pemeriksaan.${k.info ? ` Ditambah ${k.info} catatan metode yang tidak dihitung sebagai uji.` : ""}</p>
         </div>
       </section>
       ${b.total ? `<section class="kartu ringkas-jenis">
         <h2>Perbandingan dengan Galura</h2>
-        <p class="bantu">Kecocokan dengan rekap tahunan DBMPR yang memakai metode survei berbeda. Selisih di sini menunjukkan perbedaan metode, bukan kesalahan data.</p>
+        <p class="bantu">Informasi, bukan uji benar-salah. Galura direkap DBMPR dari survei visual, sedangkan peta memakai survei sensor Roadroid, jadi angkanya tidak harus sama.</p>
         <div class="ringkas-validasi">
-          <div><strong>${b.lulus} <small>/ ${b.total}</small></strong><span>sesuai</span></div>
-          <p>Penjelasan selisih ada di bagian bawah halaman.</p>
+          <div><strong>${b.lulus}</strong><span>sesuai</span></div>
+          <div><strong>${b.berbeda || 0}</strong><span>berbeda metode</span></div>
+          <p>dari ${b.total} perbandingan. Penjelasannya ada di bagian bawah halaman.</p>
         </div>
       </section>` : ""}
     </div>
@@ -44,7 +47,7 @@ function gambarValidasi(v) {
       <ul class="daftar-cek">
         ${v.pemeriksaan.filter((p) => p.kelompok === g).map((p) => `
           <li>
-            <div class="baris-cek">${chip(p.status)}<span class="nama-cek">${esc(p.nama)}</span></div>
+            <div class="baris-cek">${chip(p.status, p.jenis)}<span class="nama-cek">${esc(p.nama)}</span></div>
             <div class="hasil-cek">${esc(p.hasil)}</div>
             ${p.keterangan ? `<div class="ket-cek">${esc(p.keterangan)}</div>` : ""}
           </li>`).join("")}

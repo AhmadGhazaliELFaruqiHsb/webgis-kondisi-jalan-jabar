@@ -143,6 +143,20 @@ async function main() {
       }
       console.log(`[OK] pembanding_visual: ${vis.length} baris`);
     }
+    // 6. statistik BPS 2019 (berkas asli dari jabar.bps.go.id; baris "Jawa Barat" adalah total, dilewati)
+    if (fs.existsSync(path.join(DATA, "panjang_jalan_bps_2019.csv"))) {
+      const bps = bacaCSV("panjang_jalan_bps_2019.csv").filter((r) => r["Kabupaten/Kota"] !== "Jawa Barat");
+      const kol = (r, awal) => r[Object.keys(r).find((k) => k.startsWith(awal))];
+      for (const r of bps) {
+        const n = r["Kabupaten/Kota"];
+        const nama = /^Kota /i.test(n) ? n.toUpperCase() : `KABUPATEN ${n.toUpperCase()}`;
+        await db.query(
+          `INSERT INTO pembanding_bps (kab_kota, km_negara, km_provinsi, km_kabkota, tahun) VALUES ($1,$2,$3,$4,2019)`,
+          [nama, kol(r, "Panjang Jalan Negara"), kol(r, "Panjang Jalan Provinsi"), kol(r, "Panjang Jalan Kabupaten")]
+        );
+      }
+      console.log(`[OK] pembanding_bps   : ${bps.length} baris`);
+    }
 
     await db.query("COMMIT");
 
