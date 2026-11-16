@@ -2,10 +2,18 @@
 // Konfigurasi bersama: kelas kondisi, peta dasar, dan fungsi pembantu.
 
 const KONDISI = [
-  { nama: "Baik",         warna: "#2E9E4F", teks: "#1E2329", rentang: "IRI < 4" },
-  { nama: "Sedang",       warna: "#F2B705", teks: "#1E2329", rentang: "IRI 4 - 8" },
-  { nama: "Rusak Ringan", warna: "#F08A24", teks: "#1E2329", rentang: "IRI 8 - 12" },
-  { nama: "Rusak Berat",  warna: "#D63A2F", teks: "#FFFFFF", rentang: "IRI ≥ 12" },
+  { nama: "Baik", warna: "#2E9E4F", teks: "#1E2329", rentang: "IRI < 4",
+    gambar: "img/kondisi/baik.svg",
+    ciri: "Permukaan rata dan menerus. Kendaraan melaju nyaman tanpa guncangan berarti." },
+  { nama: "Sedang", warna: "#F2B705", teks: "#1E2329", rentang: "IRI 4 - 8",
+    gambar: "img/kondisi/sedang.svg",
+    ciri: "Mulai bergelombang, ada retak halus dan tambalan. Masih nyaman dilalui." },
+  { nama: "Rusak Ringan", warna: "#F08A24", teks: "#1E2329", rentang: "IRI 8 - 12",
+    gambar: "img/kondisi/rusak-ringan.svg",
+    ciri: "Retak berkelompok, lubang kecil, dan gelombang terasa. Kecepatan perlu dikurangi." },
+  { nama: "Rusak Berat", warna: "#D63A2F", teks: "#FFFFFF", rentang: "IRI ≥ 12",
+    gambar: "img/kondisi/rusak-berat.svg",
+    ciri: "Lubang besar dan aspal terkelupas. Guncangan kuat, berbahaya bagi pengendara." },
 ];
 const INFO = Object.fromEntries(KONDISI.map((k) => [k.nama, k]));
 
@@ -14,28 +22,49 @@ const INFO = Object.fromEntries(KONDISI.map((k) => [k.nama, k]));
 const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
 const PETA_DASAR = {
   gelap: {
-    nama: "Gelap",
+    nama: "Gelap", pilih: "#00E5FF", teksPilih: "#0B1114",
     url: `${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
     label: `${ESRI}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
     opsi: { maxZoom: 18, maxNativeZoom: 16, attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ" },
   },
   terang: {
-    nama: "Terang",
+    nama: "Terang", pilih: "#2D3BFF", teksPilih: "#FFFFFF",
     url: `${ESRI}/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
     label: `${ESRI}/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
     opsi: { maxZoom: 18, maxNativeZoom: 16, attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ" },
   },
   osm: {
-    nama: "OSM",
+    nama: "OSM", pilih: "#2D3BFF", teksPilih: "#FFFFFF",
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     opsi: { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' },
   },
   satelit: {
-    nama: "Satelit",
+    nama: "Satelit", pilih: "#00E5FF", teksPilih: "#0B1114",
     url: `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
     opsi: { maxZoom: 18, attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics" },
   },
 };
+
+// Warna seleksi (lingkaran radius, titik, sorotan hasil) dipilih berlawanan dengan palet data yang hangat
+// (hijau, kuning, oranye, merah): biru-sian. Cyan terang di peta gelap/satelit, biru tua di peta terang/OSM.
+// Warna aktif juga disalin ke variabel CSS --pilih.
+
+// Tautan resmi Google Maps ke Street View pada koordinat tertentu (untuk mencocokkan data dengan kondisi nyata)
+const urlStreetView = (lat, lng) =>
+  `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
+// Versi sematan (iframe) Street View dari Google Maps Embed, tanpa API key. arah = derajat dari utara.
+const urlStreetViewSemat = (lat, lng, arah = 0) =>
+  `https://www.google.com/maps/embed?origin=mfe&pb=!6m7!1m6!2m2!1d${Number(lat).toFixed(6)}!2d${Number(lng).toFixed(6)}!3f${Math.round(arah)}!4f0!5f1`;
+// arah (derajat dari utara) dari titik a ke titik b, agar kamera Street View menghadap sepanjang jalan
+const arahKe = (a, b) => {
+  const r = Math.PI / 180, y = Math.sin((b.lng - a.lng) * r) * Math.cos(b.lat * r);
+  const x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos((b.lng - a.lng) * r);
+  return (Math.atan2(y, x) / r + 360) % 360;
+};
+
+// Nilai variabel CSS tema yang sedang aktif (mis. warnaTema("aksen")), untuk warna yang digambar lewat JS
+const warnaTema = (nama) => getComputedStyle(document.documentElement).getPropertyValue(`--${nama}`).trim();
+const temaTerang = () => document.documentElement.dataset.tema === "terang";
 
 // ---------- fungsi pembantu ----------
 const fmt = (n, d = 1) =>

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "cek-db": "node database/cek_koneksi.js",
-    "impor-db": "node database/impor_data.js"
+    "impor-db": "node database/impor_data.js",
+    "validasi": "node database/validasi_data.js"
   },
   "dependencies": {
     "compression": "^1.7.5",

@@ -3,207 +3,212 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SIKOJAB - Peta Kondisi Jalan Provinsi Jawa Barat</title>
+  <title>SIKOJAB - Sistem Informasi Kondisi Jalan Provinsi Jawa Barat</title>
   <meta name="description" content="WebGIS kondisi kemulusan dan kerusakan jalan provinsi di Jawa Barat berdasarkan nilai IRI.">
-  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/situs.css">
+  <script>
+    // tema dipasang sebelum halaman digambar agar tidak berkedip; pilihan pengguna disimpan di peramban
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("sikojab-tema"); } catch (e) {}
+      if (t !== "terang" && t !== "gelap") t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "terang" : "gelap";
+      document.documentElement.dataset.tema = t;
+    })();
+  </script>
 </head>
-<body>
+<body class="situs" data-hal="beranda">
   <header class="kepala">
-    <div class="merek">
+    <a class="merek" href="index.html" aria-label="SIKOJAB, ke beranda">
       <span class="garis" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       <div>
         <h1>SIKOJAB</h1>
         <p>Kondisi jalan provinsi Jawa Barat</p>
       </div>
-    </div>
+    </a>
+    <nav class="nav-situs" id="navSitus" aria-label="Menu utama">
+      <a href="index.html" data-hal="beranda">Beranda</a>
+      <a href="dashboard.html" data-hal="dashboard">Dashboard</a>
+      <a href="peta.html" data-hal="peta">Peta</a>
+      <a href="validasi.html" data-hal="validasi">Validasi</a>
+      <a href="tentang.html" data-hal="tentang">Tentang</a>
+    </nav>
     <div class="kepala-aksi">
-      <button type="button" id="btnPanel" class="tombol tombol-panel" aria-expanded="true" aria-controls="sisi">Panel</button>
-      <button type="button" id="btnTentang" class="tombol">Tentang data</button>
+      <button type="button" id="btnTema" class="tombol" aria-label="Ganti tema terang atau gelap"></button>
+      <button type="button" id="btnMenu" class="tombol tombol-menu" aria-expanded="false" aria-controls="navSitus">Menu</button>
     </div>
   </header>
 
-  <div class="ruang">
-    <aside class="sisi" id="sisi" aria-label="Panel informasi">
-      <div class="tab-daftar" role="tablist" aria-label="Bagian panel">
-        <button role="tab" id="tabPeta" aria-controls="panelPeta" aria-selected="true" data-tab="peta">Peta</button>
-        <button role="tab" id="tabAnalisis" aria-controls="panelAnalisis" aria-selected="false" tabindex="-1" data-tab="analisis">Analisis</button>
-        <button role="tab" id="tabRuas" aria-controls="panelRuas" aria-selected="false" tabindex="-1" data-tab="ruas">Ruas</button>
+  <main>
+    <section class="halaman hero">
+      <div>
+        <span class="label-atas">WebGIS · Jalan Provinsi Jawa Barat</span>
+        <h1>Kondisi jalan provinsi Jawa Barat <span>dalam satu peta.</span></h1>
+        <p class="lead">SIKOJAB memetakan kemulusan dan kerusakan 297 ruas jalan provinsi per segmen 1 km berdasarkan nilai IRI,
+          dilengkapi dashboard, analisis tren, kueri spasial, dan validasi data.</p>
+        <div class="hero-aksi">
+          <a class="tombol tombol-isi tombol-besar" href="peta.html">Buka peta</a>
+          <a class="tombol tombol-besar" href="dashboard.html">Lihat dashboard</a>
+        </div>
       </div>
 
-      <!-- ============ TAB PETA ============ -->
-      <section class="panel" id="panelPeta" role="tabpanel" aria-labelledby="tabPeta">
-        <div class="ringkas">
-          <p class="angka-besar"><span id="angkaMantap">–</span><small>%</small></p>
-          <p class="angka-ket">jalan dalam kondisi mantap (baik dan sedang) di <span id="lingkup">seluruh ruas provinsi</span></p>
-          <div class="komposisi" id="komposisi" role="group" aria-label="Komposisi kondisi jalan. Klik bagian warna untuk menyaring."></div>
-          <dl class="tiga">
-            <div><dt>Ruas</dt><dd id="stRuas">–</dd></div>
-            <div><dt>Km tersurvei</dt><dd id="stKm">–</dd></div>
-            <div><dt>IRI rata-rata</dt><dd id="stIri">–</dd></div>
-          </dl>
-        </div>
-
-        <fieldset class="kelompok">
-          <legend>Tampilkan kondisi</legend>
-          <div id="filterKondisi" class="baris-kondisi"></div>
-        </fieldset>
-
-        <div class="bidang">
-          <label for="selKab">Kabupaten/Kota</label>
-          <select id="selKab"><option value="">Semua Jawa Barat</option></select>
-        </div>
-
-        <div class="bidang pencarian">
-          <label for="cari">Cari ruas</label>
-          <input id="cari" type="search" autocomplete="off" placeholder="Nama ruas atau kode, mis. Siliwangi"
-                 role="combobox" aria-expanded="false" aria-controls="saran" aria-autocomplete="list">
-          <ul id="saran" class="saran" role="listbox" hidden></ul>
-        </div>
-
-        <fieldset class="kelompok">
-          <legend>Lapisan</legend>
-          <label class="centang"><input type="checkbox" id="lapSegmen" checked> Segmen kondisi (1 km)</label>
-          <label class="centang"><input type="checkbox" id="lapRuas"> Ruas, kondisi rata-rata</label>
-          <label class="centang"><input type="checkbox" id="lapBatas" checked> Batas provinsi</label>
-        </fieldset>
-
-        <fieldset class="kelompok">
-          <legend>Peta dasar</legend>
-          <div class="pilihan-dasar" id="pilihDasar"></div>
-        </fieldset>
-
-        <section class="alat" aria-labelledby="judulAlat">
-          <h2 id="judulAlat">Jalan rusak di sekitar sebuah titik</h2>
-          <p class="bantu">Menampilkan segmen rusak ringan dan rusak berat yang berada dalam radius pilihan, dari yang terdekat.</p>
-          <div class="baris-alat">
-            <label class="mini" for="radius">Radius</label>
-            <select id="radius">
-              <option value="1000">1 km</option>
-              <option value="2000">2 km</option>
-              <option value="5000" selected>5 km</option>
-              <option value="10000">10 km</option>
-              <option value="20000">20 km</option>
-            </select>
-            <button type="button" id="btnTitik" class="tombol tombol-isi" aria-pressed="false">Pilih titik di peta</button>
-            <button type="button" id="btnLokasi" class="tombol">Lokasi saya</button>
-          </div>
-          <p id="infoTerdekat" class="bantu" aria-live="polite"></p>
-          <ol id="hasilTerdekat" class="daftar-hasil"></ol>
-        </section>
-      </section>
-
-      <!-- ============ TAB ANALISIS ============ -->
-      <section class="panel" id="panelAnalisis" role="tabpanel" aria-labelledby="tabAnalisis" hidden>
-        <p class="lingkup-analisis" id="lingkupAnalisis">Seluruh Jawa Barat</p>
-
-        <section class="blok">
-          <h2>Kemantapan jalan tahun 2018 sampai 2025</h2>
-          <p class="bantu" id="ketTren"></p>
-          <div class="kotak-grafik"><canvas id="cTren" role="img" aria-label="Grafik batang persentase panjang jalan per kondisi tiap tahun"></canvas></div>
-          <p class="sumber">Sumber: Galura Data Jabar (DBMPR). Angka tahunan ini dihitung terpisah dari survei pada peta, jadi keduanya tidak sebanding langsung.</p>
-        </section>
-
-        <section class="blok">
-          <h2>Ruas dengan IRI tertinggi</h2>
-          <ol id="daftarParah" class="daftar-ruas"></ol>
-          <p class="sumber">Sumber: survei Roadroid, Januari 2021. Klik ruas untuk melihat detailnya.</p>
-        </section>
-
-        <section class="blok">
-          <div class="judul-baris">
-            <h2>Peringkat Kabupaten/Kota</h2>
-            <select id="selTahun" aria-label="Tahun peringkat"></select>
-          </div>
-          <div class="urut">
-            <button type="button" id="btnUrut" class="tombol tombol-kecil">Urutkan dari yang terendah</button>
-          </div>
-          <div class="tabel-bungkus">
-            <table class="tabel" id="tabelPeringkat">
-              <thead><tr><th scope="col">Kabupaten/Kota</th><th scope="col" class="num">Mantap</th><th scope="col" class="num">Rusak berat</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <p class="sumber">Mantap = baik + sedang, persen dari panjang jalan provinsi di wilayah itu. Klik baris untuk menyaring peta.</p>
-        </section>
-      </section>
-
-      <!-- ============ TAB RUAS ============ -->
-      <section class="panel" id="panelRuas" role="tabpanel" aria-labelledby="tabRuas" hidden>
-        <div id="detailRuas">
-          <div class="kosong">
-            <p><strong>Belum ada ruas dipilih.</strong></p>
-            <p>Klik garis jalan di peta, atau cari namanya di tab Peta.</p>
-          </div>
-        </div>
-      </section>
-    </aside>
-
-    <main class="peta-bungkus">
-      <div id="peta" aria-label="Peta kondisi jalan"></div>
-      <div id="pesanPeta" class="pesan-peta" role="status" hidden></div>
-      <div id="galat" class="galat" role="alert" hidden>
-        <p id="teksGalat"></p>
-        <button type="button" class="tombol" onclick="location.reload()">Coba lagi</button>
+      <div class="hero-kartu" aria-live="polite">
+        <p class="angka-besar"><span id="bMantap">–</span><small>%</small></p>
+        <p class="angka-ket">jalan provinsi dalam kondisi <span>mantap</span> (baik dan sedang) menurut survei Roadroid</p>
+        <div class="batang-komposisi" id="bKomposisi" role="img" aria-label="Komposisi panjang jalan per kondisi"></div>
+        <ul class="legenda-baris" id="bLegenda"></ul>
+        <dl class="tiga">
+          <div><dt>Ruas</dt><dd id="bRuas">–</dd></div>
+          <div><dt>Km tersurvei</dt><dd id="bKm">–</dd></div>
+          <div><dt>IRI rata-rata</dt><dd id="bIri">–</dd></div>
+        </dl>
+        <p class="catatan" id="bCatatan">Survei Roadroid, Januari 2021.</p>
       </div>
-    </main>
-  </div>
+    </section>
 
-  <dialog id="dlgTentang" class="dialog" aria-labelledby="judulTentang">
-    <form method="dialog" class="dialog-isi">
-      <div class="dialog-kepala">
-        <h2 id="judulTentang">Tentang data dan metode</h2>
-        <button class="tombol" value="tutup">Tutup</button>
+    <section class="bagian">
+      <div class="halaman">
+        <div class="bagian-kepala">
+          <div>
+            <span class="label-atas">Fitur</span>
+            <h2>Apa saja yang ada di SIKOJAB</h2>
+          </div>
+        </div>
+        <div class="grid-3">
+          <a class="kartu" href="dashboard.html">
+            <span class="ikon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+            <h3>Dashboard</h3>
+            <p>Ringkasan angka kondisi jalan, komposisi, tren kemantapan 2018–2025, dan peringkat Kabupaten/Kota.</p>
+            <span class="lanjut">Buka dashboard →</span>
+          </a>
+          <a class="kartu" href="peta.html">
+            <span class="ikon"><svg viewBox="0 0 24 24"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg></span>
+            <h3>Peta kondisi jalan</h3>
+            <p>Segmen ±1 km diwarnai menurut IRI, dengan filter kondisi dan wilayah, pencarian ruas, dan profil IRI per ruas.</p>
+            <span class="lanjut">Buka peta →</span>
+          </a>
+          <a class="kartu" href="peta.html">
+            <span class="ikon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>
+            <h3>Jalan rusak di sekitar titik</h3>
+            <p>Kueri spasial ST_DWithin di PostGIS: cari segmen rusak dalam radius 1–20 km dari titik pilihan atau lokasi Anda.</p>
+            <span class="lanjut">Coba di peta →</span>
+          </a>
+          <a class="kartu" href="peta.html">
+            <span class="ikon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg></span>
+            <h3>Foto jalan Street View</h3>
+            <p>Lihat kondisi nyata tiap segmen langsung dari Google Street View, di pop-up peta maupun panel detail ruas.</p>
+            <span class="lanjut">Lihat di peta →</span>
+          </a>
+          <a class="kartu" href="validasi.html">
+            <span class="ikon"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span>
+            <h3>Validasi data otomatis</h3>
+            <p>19 pemeriksaan keakuratan dan konsistensi data langsung di PostGIS, termasuk perbandingan dengan data resmi Galura.</p>
+            <span class="lanjut">Lihat hasil validasi →</span>
+          </a>
+          <a class="kartu" href="tentang.html">
+            <span class="ikon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
+            <h3>Data dan metode</h3>
+            <p>Sumber data Temanjabar dan Galura (DBMPR), cara pengolahan segmen, batas kelas IRI, dan teknologi yang dipakai.</p>
+            <span class="lanjut">Baca selengkapnya →</span>
+          </a>
+        </div>
       </div>
+    </section>
 
-      <p>SIKOJAB memetakan kondisi kemulusan jalan provinsi di Jawa Barat. Warna garis menunjukkan kelas kondisi berdasarkan IRI (International Roughness Index), yaitu ukuran ketidakrataan permukaan jalan dalam m/km. Makin tinggi nilainya, makin bergelombang jalannya.</p>
+    <section class="bagian">
+      <div class="halaman">
+        <div class="bagian-kepala">
+          <div>
+            <span class="label-atas">Klasifikasi</span>
+            <h2>Empat kelas kondisi jalan</h2>
+            <p>Kelas ditentukan dari IRI (International Roughness Index), ukuran ketidakrataan permukaan jalan dalam m/km.
+              Jalan disebut <strong>mantap</strong> bila berkondisi baik atau sedang.</p>
+          </div>
+        </div>
+        <div class="grid-4" id="kelasKondisi"></div>
+        <p class="sumber">Gambar adalah ilustrasi umum tiap kelas, bukan foto ruas tertentu. Foto nyata tersedia lewat Street View di halaman Peta.</p>
+      </div>
+    </section>
 
-      <h3>Kelas kondisi</h3>
-      <table class="tabel tabel-info">
-        <tbody>
-          <tr><td><i class="titik" style="background:#2E9E4F"></i> Baik</td><td>IRI di bawah 4</td></tr>
-          <tr><td><i class="titik" style="background:#F2B705"></i> Sedang</td><td>IRI 4 sampai di bawah 8</td></tr>
-          <tr><td><i class="titik" style="background:#F08A24"></i> Rusak ringan</td><td>IRI 8 sampai di bawah 12</td></tr>
-          <tr><td><i class="titik" style="background:#D63A2F"></i> Rusak berat</td><td>IRI 12 ke atas</td></tr>
-        </tbody>
-      </table>
-      <p>Jalan disebut <strong>mantap</strong> bila berkondisi baik atau sedang, dan <strong>tidak mantap</strong> bila rusak ringan atau rusak berat.</p>
+    <section class="bagian">
+      <div class="halaman">
+        <div class="bagian-kepala">
+          <div>
+            <span class="label-atas">Sumber data</span>
+            <h2>Dari mana datanya</h2>
+          </div>
+          <a class="tautan" href="tentang.html">Detail data dan metode →</a>
+        </div>
+        <div class="grid-2">
+          <div class="kartu kartu-sumber">
+            <h3>Temanjabar (GeoServer DBMPR Jabar)</h3>
+            <p>Data spasial untuk peta.</p>
+            <ul>
+              <li>297 ruas jalan provinsi</li>
+              <li>Titik survei Roadroid Januari 2021, diolah menjadi 2.571 segmen ±1 km</li>
+              <li>Batas Provinsi Jawa Barat</li>
+            </ul>
+          </div>
+          <div class="kartu kartu-sumber">
+            <h3>Galura Data Jabar (DBMPR)</h3>
+            <p>Data resmi tahunan untuk tren dan validasi.</p>
+            <ul>
+              <li>Panjang jalan per kondisi per Kabupaten/Kota</li>
+              <li>27 Kabupaten/Kota, tahun 2018 sampai 2025</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
 
-      <h3>Sumber data</h3>
-      <table class="tabel tabel-info">
-        <tbody>
-          <tr><td>Ruas jalan provinsi (297 ruas)</td><td>Temanjabar, GeoServer DBMPR, layer 1_rj_prov_kemantapan</td></tr>
-          <tr><td>Nilai IRI per titik survei</td><td>Survei Roadroid, Temanjabar, Januari 2021, layer 7_rj_roadroid_skj</td></tr>
-          <tr><td>Batas provinsi</td><td>Temanjabar, layer daerah_jawa_barat</td></tr>
-          <tr><td>Panjang jalan per kondisi, 2018 sampai 2025</td><td>Galura Data Jabar (DBMPR)</td></tr>
-        </tbody>
-      </table>
+  <footer class="kaki">
+    <div class="halaman">
+      <div>
+        <p><strong>SIKOJAB</strong> · Sistem Informasi Kondisi Jalan Provinsi Jawa Barat</p>
+        <p>Tugas Besar Pemetaan Berbasis Web (TPBW-50-GAB), Telkom University</p>
+      </div>
+      <div>
+        <p>Ahmad Ghazali El-Faruqi Hsb (101032330080)</p>
+        <p>Muhammad Afif Anwar (101032300148)</p>
+      </div>
+    </div>
+  </footer>
 
-      <h3>Cara pengolahan</h3>
-      <p>Titik survei berjarak sekitar 50 m. Setiap 20 titik berurutan digabung menjadi satu segmen sepanjang sekitar 1 km, nilai IRI segmen adalah rata-rata titiknya, lalu kelasnya ditentukan dari batas di atas. Segmen terakhir pada tiap ruas bisa lebih pendek. Kondisi per ruas dihitung dari rata-rata seluruh titiknya.</p>
-
-      <h3>Hal yang perlu diperhatikan</h3>
-      <ul>
-        <li>Peta menampilkan satu survei (Januari 2021). Grafik tren dan peringkat memakai data tahunan DBMPR yang berbeda sumber, jadi tidak bisa dibandingkan langsung. Contohnya pada 2021: data tahunan mencatat sekitar 82% jalan mantap, sedangkan survei Roadroid pada peta menghasilkan sekitar 49%. Selisih ini kemungkinan berasal dari perbedaan metode ukur dan batas kelas.</li>
-        <li>Panjang resmi ruas dan panjang hasil survei bisa sedikit berbeda, karena panjang survei dihitung dari jumlah titik pengukuran. Panel ruas menampilkan panjang tersurvei per kondisi.</li>
-        <li>Nilai IRI hasil Roadroid diukur dengan sensor ponsel, sehingga bersifat indikatif dan bukan pengganti survei dengan alat profil jalan.</li>
-        <li>Data tidak menggambarkan kondisi terbaru di lapangan.</li>
-      </ul>
-
-      <h3>Teknologi</h3>
-      <p>PostgreSQL dengan PostGIS, Node.js dengan Express, Leaflet, dan Chart.js. Pencarian jalan rusak di sekitar titik memakai fungsi ST_DWithin pada PostGIS.</p>
-
-      <p class="penutup">Tugas Besar Pemetaan Berbasis Web (TPBW-50-GAB), Telkom University.<br>
-        Ahmad Ghazali El-Faruqi Hsb (101032330080) dan Muhammad Afif Anwar (101032300148).</p>
-    </form>
-  </dialog>
-
-  <noscript><p class="tanpa-js">Halaman ini membutuhkan JavaScript untuk menampilkan peta.</p></noscript>
-
-  <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="vendor/chart/chart.umd.js"></script>
   <script src="js/konfigurasi.js"></script>
-  <script src="js/peta.js"></script>
-  <script src="js/panel.js"></script>
+  <script src="js/situs.js"></script>
+  <script>
+    "use strict";
+    // kartu kelas kondisi
+    document.getElementById("kelasKondisi").innerHTML = KONDISI.map((k) => `
+      <div class="kartu kartu-kelas">
+        <img src="${k.gambar}" alt="Ilustrasi jalan kondisi ${k.nama.toLowerCase()}" loading="lazy">
+        <div>
+          <h3><i class="titik" style="background:${k.warna}"></i>${k.nama}<span class="rentang">${k.rentang}</span></h3>
+          <p>${k.ciri}</p>
+        </div>
+      </div>`).join("");
+
+    // angka ringkas langsung dari database
+    (async () => {
+      try {
+        const r = await api("/api/ringkasan");
+        document.getElementById("bMantap").textContent = fmt(r.persen_mantap, 1);
+        document.getElementById("bRuas").textContent = fmt(r.jumlah_ruas, 0);
+        document.getElementById("bKm").textContent = fmt(r.km_survei, 0);
+        document.getElementById("bIri").textContent = fmt(r.iri_rata2, 1);
+        document.getElementById("bKomposisi").innerHTML = KONDISI.map((k) =>
+          `<i style="flex:${r.km[k.nama] || 0} 1 0;background:${k.warna}" title="${k.nama}: ${fmt(r.km[k.nama], 1)} km"></i>`).join("");
+        document.getElementById("bLegenda").innerHTML = KONDISI.map((k) =>
+          `<li><i style="background:${k.warna}"></i>${k.nama} ${fmt((r.km[k.nama] / r.km_survei) * 100, 0)}%</li>`).join("");
+        const tren = await api("/api/tren");
+        const akhir = tren[tren.length - 1];
+        if (akhir) document.getElementById("bCatatan").textContent =
+          `Survei Roadroid, Januari 2021. Data resmi Galura ${akhir.tahun}: ${fmt(akhir.persen_mantap, 1)}% mantap.`;
+      } catch (e) {
+        document.getElementById("bCatatan").textContent = e.message;
+      }
+    })();
+  </script>
 </body>
 </html>

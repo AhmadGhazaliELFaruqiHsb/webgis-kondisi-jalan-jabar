@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tentang - SIKOJAB</title>
+  <meta name="description" content="Data, metode pengolahan, teknologi, dan tim pengembang SIKOJAB.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/situs.css">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("sikojab-tema"); } catch (e) {}
+      if (t !== "terang" && t !== "gelap") t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "terang" : "gelap";
+      document.documentElement.dataset.tema = t;
+    })();
+  </script>
+</head>
+<body class="situs" data-hal="tentang">
+  <header class="kepala">
+    <a class="merek" href="index.html" aria-label="SIKOJAB, ke beranda">
+      <span class="garis" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <div>
+        <h1>SIKOJAB</h1>
+        <p>Kondisi jalan provinsi Jawa Barat</p>
+      </div>
+    </a>
+    <nav class="nav-situs" id="navSitus" aria-label="Menu utama">
+      <a href="index.html" data-hal="beranda">Beranda</a>
+      <a href="dashboard.html" data-hal="dashboard">Dashboard</a>
+      <a href="peta.html" data-hal="peta">Peta</a>
+      <a href="validasi.html" data-hal="validasi">Validasi</a>
+      <a href="tentang.html" data-hal="tentang">Tentang</a>
+    </nav>
+    <div class="kepala-aksi">
+      <button type="button" id="btnTema" class="tombol" aria-label="Ganti tema terang atau gelap"></button>
+      <button type="button" id="btnMenu" class="tombol tombol-menu" aria-expanded="false" aria-controls="navSitus">Menu</button>
+    </div>
+  </header>
+
+  <main class="halaman halaman-teks">
+    <h1>Tentang SIKOJAB</h1>
+    <p class="lead">SIKOJAB (Sistem Informasi Kondisi Jalan Provinsi Jawa Barat) memetakan kondisi kemulusan jalan provinsi di Jawa Barat.
+      Warna garis pada peta menunjukkan kelas kondisi berdasarkan IRI (International Roughness Index), yaitu ukuran ketidakrataan
+      permukaan jalan dalam m/km. Makin tinggi nilainya, makin bergelombang jalannya.</p>
+
+    <h2>Kelas kondisi</h2>
+    <ul id="kelasGambar" class="kelas-gambar"></ul>
+    <p>Jalan disebut <strong>mantap</strong> bila berkondisi baik atau sedang, dan <strong>tidak mantap</strong> bila rusak ringan atau rusak berat.</p>
+    <p class="sumber">Gambar adalah ilustrasi umum tiap kelas, bukan foto ruas tertentu. IRI mengukur ketidakrataan permukaan, sedangkan retak
+      dan lubang hanyalah contoh kerusakan yang biasa menyertainya. Foto nyata di lokasi tersedia lewat Street View pada halaman Peta.</p>
+
+    <h2>Sumber data</h2>
+    <div class="tabel-bungkus">
+      <table class="tabel tabel-info">
+        <tbody>
+          <tr><td>Ruas jalan provinsi (297 ruas)</td><td>Temanjabar, GeoServer DBMPR, layer 1_rj_prov_kemantapan</td></tr>
+          <tr><td>Nilai IRI per titik survei</td><td>Survei Roadroid, Temanjabar, Januari 2021, layer 7_rj_roadroid_skj</td></tr>
+          <tr><td>Batas provinsi</td><td>Temanjabar, layer daerah_jawa_barat</td></tr>
+          <tr><td>Panjang jalan per kondisi, 2018 sampai 2025</td><td>Galura Data Jabar (DBMPR)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Cara pengolahan</h2>
+    <p>Titik survei berjarak sekitar 50 m. Setiap 20 titik berurutan digabung menjadi satu segmen sepanjang sekitar 1 km, nilai IRI
+      segmen adalah rata-rata titiknya, lalu kelasnya ditentukan dari batas di atas. Segmen terakhir pada tiap ruas bisa lebih pendek.
+      Pengolahan dilakukan dengan Python dan GeoPandas, lalu hasilnya diimpor ke PostgreSQL/PostGIS.</p>
+
+    <h2>Hal yang perlu diperhatikan</h2>
+    <ul>
+      <li>Peta menampilkan satu survei (Januari 2021). Grafik tren dan peringkat memakai data tahunan DBMPR yang berbeda sumber, jadi tidak
+        bisa dibandingkan langsung. Contohnya pada 2021: data tahunan mencatat sekitar 82% jalan mantap, sedangkan survei Roadroid pada
+        peta menghasilkan sekitar 49%. Penyebab selisihnya belum dapat dipastikan; perbedaan metode ukur, waktu, dan batas kelas adalah kemungkinannya.</li>
+      <li>Nilai IRI hasil Roadroid diukur dengan sensor ponsel, sehingga bersifat indikatif dan bukan pengganti survei dengan alat profil jalan.</li>
+      <li>Foto Street View berasal dari Google dan tanggal pemotretannya berbeda dengan tanggal survei.</li>
+      <li>Data tidak menggambarkan kondisi terbaru di lapangan.</li>
+      <li>Hasil pemeriksaan keakuratan data dapat dilihat di halaman <a class="tautan" href="validasi.html">Validasi</a>.</li>
+    </ul>
+
+    <h2>Teknologi</h2>
+    <ul>
+      <li><strong>Database:</strong> PostgreSQL dengan PostGIS (indeks spasial GiST, kueri ST_DWithin untuk pencarian dalam radius).</li>
+      <li><strong>Back end:</strong> Node.js dengan Express, menyediakan REST API.</li>
+      <li><strong>Front end:</strong> Leaflet untuk peta, Chart.js untuk grafik, Google Street View (embed) untuk foto jalan.</li>
+      <li><strong>Pengolahan data:</strong> Python dengan GeoPandas.</li>
+    </ul>
+
+    <h2>Tim</h2>
+    <p>Tugas Besar Pemetaan Berbasis Web (TPBW-50-GAB), Telkom University.</p>
+    <ul class="anggota">
+      <li class="kartu"><strong>Ahmad Ghazali El-Faruqi Hsb</strong><span>101032330080</span></li>
+      <li class="kartu"><strong>Muhammad Afif Anwar</strong><span>101032300148</span></li>
+    </ul>
+  </main>
+
+  <footer class="kaki">
+    <div class="halaman">
+      <div>
+        <p><strong>SIKOJAB</strong> · Sistem Informasi Kondisi Jalan Provinsi Jawa Barat</p>
+        <p>Tugas Besar Pemetaan Berbasis Web (TPBW-50-GAB), Telkom University</p>
+      </div>
+      <div>
+        <p>Ahmad Ghazali El-Faruqi Hsb (101032330080)</p>
+        <p>Muhammad Afif Anwar (101032300148)</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/konfigurasi.js"></script>
+  <script src="js/situs.js"></script>
+  <script>
+    "use strict";
+    document.getElementById("kelasGambar").innerHTML = KONDISI.map((c) => `
+      <li>
+        <img src="${c.gambar}" alt="Ilustrasi jalan kondisi ${c.nama.toLowerCase()}" width="160" height="90" loading="lazy">
+        <div><strong><i class="titik" style="background:${c.warna}"></i> ${c.nama}</strong> <span>${c.rentang}</span><p>${c.ciri}</p></div>
+      </li>`).join("");
+  </script>
+</body>
+</html>

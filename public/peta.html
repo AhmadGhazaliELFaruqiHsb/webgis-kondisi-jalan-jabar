@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Peta - SIKOJAB</title>
+  <meta name="description" content="WebGIS kondisi kemulusan dan kerusakan jalan provinsi di Jawa Barat berdasarkan nilai IRI.">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // tema dipasang sebelum halaman digambar agar tidak berkedip; pilihan pengguna disimpan di peramban
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("sikojab-tema"); } catch (e) {}
+      if (t !== "terang" && t !== "gelap") t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "terang" : "gelap";
+      document.documentElement.dataset.tema = t;
+    })();
+  </script>
+</head>
+<body data-hal="peta">
+  <header class="kepala">
+    <a class="merek" href="index.html" aria-label="SIKOJAB, ke beranda">
+      <span class="garis" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <div>
+        <h1>SIKOJAB</h1>
+        <p>Kondisi jalan provinsi Jawa Barat</p>
+      </div>
+    </a>
+    <nav class="nav-situs" id="navSitus" aria-label="Menu utama">
+      <a href="index.html" data-hal="beranda">Beranda</a>
+      <a href="dashboard.html" data-hal="dashboard">Dashboard</a>
+      <a href="peta.html" data-hal="peta">Peta</a>
+      <a href="validasi.html" data-hal="validasi">Validasi</a>
+      <a href="tentang.html" data-hal="tentang">Tentang</a>
+    </nav>
+    <div class="kepala-aksi">
+      <button type="button" id="btnPanel" class="tombol tombol-panel" aria-expanded="true" aria-controls="sisi">Panel</button>
+      <button type="button" id="btnTema" class="tombol" aria-label="Ganti tema terang atau gelap"></button>
+      <button type="button" id="btnMenu" class="tombol tombol-menu" aria-expanded="false" aria-controls="navSitus">Menu</button>
+    </div>
+  </header>
+
+  <div class="ruang">
+    <aside class="sisi" id="sisi" aria-label="Panel informasi">
+      <div class="tab-daftar" role="tablist" aria-label="Bagian panel">
+        <button role="tab" id="tabPeta" aria-controls="panelPeta" aria-selected="true" data-tab="peta">Peta</button>
+        <button role="tab" id="tabAnalisis" aria-controls="panelAnalisis" aria-selected="false" tabindex="-1" data-tab="analisis">Analisis</button>
+        <button role="tab" id="tabRuas" aria-controls="panelRuas" aria-selected="false" tabindex="-1" data-tab="ruas">Ruas</button>
+      </div>
+
+      <!-- ============ TAB PETA ============ -->
+      <section class="panel" id="panelPeta" role="tabpanel" aria-labelledby="tabPeta">
+        <div class="ringkas">
+          <p class="angka-besar"><span id="angkaMantap">–</span><small>%</small></p>
+          <p class="angka-ket">jalan dalam kondisi mantap (baik dan sedang) di <span id="lingkup">seluruh ruas provinsi</span></p>
+          <div class="komposisi" id="komposisi" role="group" aria-label="Komposisi kondisi jalan. Klik bagian warna untuk menyaring."></div>
+          <dl class="tiga">
+            <div><dt>Ruas</dt><dd id="stRuas">–</dd></div>
+            <div><dt>Km tersurvei</dt><dd id="stKm">–</dd></div>
+            <div><dt>IRI rata-rata</dt><dd id="stIri">–</dd></div>
+          </dl>
+        </div>
+
+        <fieldset class="kelompok">
+          <legend>Tampilkan kondisi</legend>
+          <div id="filterKondisi" class="baris-kondisi"></div>
+        </fieldset>
+
+        <div class="bidang">
+          <label for="selKab">Kabupaten/Kota</label>
+          <select id="selKab"><option value="">Semua Jawa Barat</option></select>
+        </div>
+
+        <div class="bidang pencarian">
+          <label for="cari">Cari ruas</label>
+          <input id="cari" type="search" autocomplete="off" placeholder="Nama ruas atau kode, mis. Siliwangi"
+                 role="combobox" aria-expanded="false" aria-controls="saran" aria-autocomplete="list">
+          <ul id="saran" class="saran" role="listbox" hidden></ul>
+        </div>
+
+        <fieldset class="kelompok">
+          <legend>Lapisan</legend>
+          <label class="centang"><input type="checkbox" id="lapSegmen" checked> Segmen kondisi (1 km)</label>
+          <label class="centang"><input type="checkbox" id="lapRuas"> Ruas, kondisi rata-rata</label>
+          <label class="centang"><input type="checkbox" id="lapBatas" checked> Batas provinsi</label>
+        </fieldset>
+
+        <fieldset class="kelompok">
+          <legend>Peta dasar</legend>
+          <div class="pilihan-dasar" id="pilihDasar"></div>
+        </fieldset>
+
+        <section class="alat" aria-labelledby="judulAlat">
+          <h2 id="judulAlat">Jalan rusak di sekitar sebuah titik</h2>
+          <p class="bantu">Menampilkan segmen rusak ringan dan rusak berat yang berada dalam radius pilihan, dari yang terdekat.</p>
+          <div class="baris-alat">
+            <label class="mini" for="radius">Radius</label>
+            <select id="radius">
+              <option value="1000">1 km</option>
+              <option value="2000">2 km</option>
+              <option value="5000" selected>5 km</option>
+              <option value="10000">10 km</option>
+              <option value="20000">20 km</option>
+            </select>
+            <button type="button" id="btnTitik" class="tombol tombol-isi" aria-pressed="false">Pilih titik di peta</button>
+            <button type="button" id="btnLokasi" class="tombol">Lokasi saya</button>
+          </div>
+          <p id="infoTerdekat" class="bantu" aria-live="polite"></p>
+          <ol id="hasilTerdekat" class="daftar-hasil"></ol>
+        </section>
+      </section>
+
+      <!-- ============ TAB ANALISIS ============ -->
+      <section class="panel" id="panelAnalisis" role="tabpanel" aria-labelledby="tabAnalisis" hidden>
+        <p class="lingkup-analisis" id="lingkupAnalisis">Seluruh Jawa Barat</p>
+
+        <section class="blok">
+          <div class="blok-kepala">
+            <h2>Tren kondisi jalan</h2>
+            <span class="label-sumber">Galura · 2018–2025</span>
+          </div>
+          <p class="bantu" id="ketTren"></p>
+          <div class="tren-grid" id="trenGrid"></div>
+          <p class="sumber">Persen dari panjang jalan provinsi tiap tahun. Data tahunan ini terpisah dari survei pada peta, jadi tidak sebanding langsung.</p>
+        </section>
+
+        <section class="blok">
+          <div class="blok-kepala">
+            <h2>Ruas dengan IRI tertinggi</h2>
+            <span class="label-sumber">Roadroid · Jan 2021</span>
+          </div>
+          <ol id="daftarParah" class="daftar-ruas"></ol>
+          <p class="sumber">IRI rata-rata ruas dalam m/km. Klik ruas untuk melihat detailnya.</p>
+        </section>
+
+        <section class="blok">
+          <div class="blok-kepala">
+            <h2>Peringkat Kabupaten/Kota</h2>
+            <span class="label-sumber">Galura</span>
+          </div>
+          <div class="alat-tabel">
+            <label class="mini" for="selTahun">Tahun</label>
+            <select id="selTahun"></select>
+            <button type="button" id="btnUrut" class="tombol tombol-kecil">Urutkan dari yang terendah</button>
+          </div>
+          <div class="tabel-bungkus">
+            <table class="tabel" id="tabelPeringkat">
+              <thead><tr><th scope="col" class="no">#</th><th scope="col">Kabupaten/Kota</th><th scope="col" class="num">Mantap</th><th scope="col" class="num">Rusak berat</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="sumber">Mantap = baik + sedang. Rusak berat dalam km. Klik baris untuk menyaring peta.</p>
+        </section>
+      </section>
+
+      <!-- ============ TAB RUAS ============ -->
+      <section class="panel" id="panelRuas" role="tabpanel" aria-labelledby="tabRuas" hidden>
+        <div id="detailRuas">
+          <div class="kosong">
+            <p><strong>Belum ada ruas dipilih.</strong></p>
+            <p>Klik garis jalan di peta, atau cari namanya di tab Peta.</p>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="peta-bungkus">
+      <div id="peta" aria-label="Peta kondisi jalan"></div>
+      <div id="pesanPeta" class="pesan-peta" role="status" hidden></div>
+      <div id="galat" class="galat" role="alert" hidden>
+        <p id="teksGalat"></p>
+        <button type="button" class="tombol" onclick="location.reload()">Coba lagi</button>
+      </div>
+    </main>
+  </div>
+
+  <noscript><p class="tanpa-js">Halaman ini membutuhkan JavaScript untuk menampilkan peta.</p></noscript>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/chart/chart.umd.js"></script>
+  <script src="js/konfigurasi.js"></script>
+  <script src="js/situs.js"></script>
+  <script src="js/peta.js"></script>
+  <script src="js/panel.js"></script>
+</body>
+</html>

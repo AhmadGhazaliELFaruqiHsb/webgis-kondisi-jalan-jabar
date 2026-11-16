@@ -94,11 +94,12 @@ async function main() {
     }
     console.log(`[OK] segmen_kondisi   : ${segmen.length} baris`);
 
-    // 3. batas provinsi
+    // 3. batas provinsi (ST_MakeValid membuang cincin poligon rusak hasil penyederhanaan di Tahap 2)
     const batas = bacaGeoJSON("batas_jabar.geojson");
     for (const f of batas) {
       await db.query(
-        `INSERT INTO batas_jabar (nama, geom) VALUES ($1, ST_SetSRID(ST_Multi(ST_GeomFromGeoJSON($2)), 4326))`,
+        `INSERT INTO batas_jabar (nama, geom)
+         VALUES ($1, ST_SetSRID(ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_GeomFromGeoJSON($2)), 3)), 4326))`,
         [f.properties.nama, JSON.stringify(f.geometry)]
       );
     }
@@ -124,10 +125,11 @@ async function main() {
       SELECT
         (SELECT COUNT(*) FROM ruas_jalan     WHERE NOT ST_IsValid(geom)) AS ruas_tidak_valid,
         (SELECT COUNT(*) FROM segmen_kondisi WHERE NOT ST_IsValid(geom)) AS segmen_tidak_valid,
+        (SELECT COUNT(*) FROM batas_jabar    WHERE NOT ST_IsValid(geom)) AS batas_tidak_valid,
         (SELECT ROUND(SUM(km_akhir - km_awal), 1) FROM segmen_kondisi)   AS km_survei,
         (SELECT PostGIS_Version())                                       AS versi_postgis`);
     const c = cek.rows[0];
-    console.log(`[OK] Geometri tidak valid: ruas ${c.ruas_tidak_valid}, segmen ${c.segmen_tidak_valid}`);
+    console.log(`[OK] Geometri tidak valid: ruas ${c.ruas_tidak_valid}, segmen ${c.segmen_tidak_valid}, batas ${c.batas_tidak_valid}`);
     console.log(`[OK] Total panjang tersurvei: ${c.km_survei} km | PostGIS ${c.versi_postgis}`);
     console.log("\nSelesai. Jalankan server dengan: npm start");
   } catch (err) {

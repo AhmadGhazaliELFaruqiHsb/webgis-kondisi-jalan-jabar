@@ -6,6 +6,7 @@ const cors = require("cors");
 const compression = require("compression");
 const path = require("path");
 const { Pool } = require("pg");
+const { jalankanValidasi } = require("./database/validasi_data");
 
 const app = express();
 const pool = new Pool({ max: 10 }); // PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE dibaca dari .env
@@ -61,6 +62,20 @@ function keFeatureCollection(rows, idKolom) {
   };
 }
 
+// Ringkasan per ruas yang dihitung dari SEGMEN 1 km, supaya angka di semua tampilan konsisten dengan peta.
+// (Kolom km_* dan persen_mantap di tabel ruas_jalan dihitung per titik survei dan tidak dipakai di tampilan.)
+const AGREGAT_SEGMEN = `(
+  SELECT idruas,
+         SUM(km_akhir - km_awal)::float AS km_survei,
+         COALESCE(SUM(km_akhir - km_awal) FILTER (WHERE kondisi = 'Baik'), 0)::float AS km_baik,
+         COALESCE(SUM(km_akhir - km_awal) FILTER (WHERE kondisi = 'Sedang'), 0)::float AS km_sedang,
+         COALESCE(SUM(km_akhir - km_awal) FILTER (WHERE kondisi = 'Rusak Ringan'), 0)::float AS km_rusak_ringan,
+         COALESCE(SUM(km_akhir - km_awal) FILTER (WHERE kondisi = 'Rusak Berat'), 0)::float AS km_rusak_berat,
+         ROUND((100 * COALESCE(SUM(km_akhir - km_awal) FILTER (WHERE kondisi IN ('Baik', 'Sedang')), 0)
+                / NULLIF(SUM(km_akhir - km_awal), 0))::numeric, 1)::float AS persen_mantap
+  FROM segmen_kondisi GROUP BY idruas
+)`;
+
 const bulat = (n, d = 2) => Math.round(Number(n) * 10 ** d) / 10 ** d;
 
 // ---------------------------------------------------------------- endpoint
@@ -89,18 +104,18 @@ app.get("/api/batas", rute(async (req, res) => {
 // Ruas jalan (GeoJSON) - filter: kondisi, kab_kota, q (nama ruas)
 app.get("/api/ruas", rute(async (req, res) => {
   const r = await pool.query(
-    `SELECT idruas, nm_ruas, kab_kota, wil_uptd, panjang_km::float AS panjang_km, iri_rata2::float AS iri_rata2,
-            kondisi, persen_mantap::float AS persen_mantap, ST_AsGeoJSON(geom, 6) AS geom
-     FROM ruas_jalan
-     WHERE kondisi = ANY($1)
-       AND ($2::text IS NULL OR kab_kota = $2)
-       AND ($3::text IS NULL OR nm_ruas ILIKE '%' || $3 || '%')
-     ORDER BY idruas`,
+    `SELECT r.idruas, r.nm_ruas, r.kab_kota, r.wil_uptd, r.panjang_km::float AS panjang_km, r.iri_rata2::float AS iri_rata2,
+            r.kondisi, a.persen_mantap, ST_AsGeoJSON(r.geom, 6) AS geom
+     FROM ruas_jalan r
+     LEFT JOIN ${AGREGAT_SEGMEN} a ON a.idruas = r.idruas
+     WHERE r.kondisi = ANY($1)
+       AND ($2::text IS NULL OR r.kab_kota = $2)
+       AND ($3::text IS NULL OR r.nm_ruas ILIKE '%' || $3 || '%')
+     ORDER BY r.idruas`,
     [ambilKondisi(req.query.kondisi), ambilTeks(req.query.kab_kota), ambilTeks(req.query.q)]
   );
   res.json(keFeatureCollection(r.rows, "idruas"));
 }));
-
 // Segmen kondisi (GeoJSON) - filter: kondisi, kab_kota, idruas
 app.get("/api/segmen", rute(async (req, res) => {
   const r = await pool.query(
@@ -133,41 +148,46 @@ app.get("/api/cari", rute(async (req, res) => {
   res.json(r.rows);
 }));
 
-// Detail satu ruas: atribut, batas peta, geometri, dan seluruh segmennya
+// Detail satu ruas: atribut, batas peta, geometri, dan seluruh segmennya.
+// Panjang per kondisi dan persen mantap dihitung dari segmen (konsisten dengan peta).
 app.get("/api/ruas/:id", rute(async (req, res) => {
   const id = ambilTeks(req.params.id);
   const [ruas, segmen] = await Promise.all([
     pool.query(
-      `SELECT idruas, nm_ruas, kab_kota, wil_uptd, uptd, panjang_km::float AS panjang_km, iri_rata2::float AS iri_rata2,
-              kondisi, persen_mantap::float AS persen_mantap, km_baik::float AS km_baik, km_sedang::float AS km_sedang,
-              km_rusak_ringan::float AS km_rusak_ringan, km_rusak_berat::float AS km_rusak_berat,
-              ST_XMin(geom) AS x_min, ST_YMin(geom) AS y_min, ST_XMax(geom) AS x_maks, ST_YMax(geom) AS y_maks,
-              ST_AsGeoJSON(geom, 6) AS geom
-       FROM ruas_jalan WHERE idruas = $1`, [id]),
+      `SELECT r.idruas, r.nm_ruas, r.kab_kota, r.wil_uptd, r.uptd, r.panjang_km::float AS panjang_km,
+              r.iri_rata2::float AS iri_rata2, r.kondisi,
+              a.persen_mantap, a.km_survei, a.km_baik, a.km_sedang, a.km_rusak_ringan, a.km_rusak_berat,
+              ST_XMin(r.geom) AS x_min, ST_YMin(r.geom) AS y_min, ST_XMax(r.geom) AS x_maks, ST_YMax(r.geom) AS y_maks,
+              ST_AsGeoJSON(r.geom, 6) AS geom
+       FROM ruas_jalan r
+       LEFT JOIN ${AGREGAT_SEGMEN} a ON a.idruas = r.idruas
+       WHERE r.idruas = $1`, [id]),
     pool.query(
-      `SELECT km_awal::float AS km_awal, km_akhir::float AS km_akhir, nilai_iri::float AS nilai_iri, kondisi
+      // lat/lng = titik tengah segmen (pasti di badan jalan), dipakai untuk Street View di panel Ruas
+      `SELECT km_awal::float AS km_awal, km_akhir::float AS km_akhir, nilai_iri::float AS nilai_iri, kondisi,
+              ROUND(ST_Y(ST_LineInterpolatePoint(geom, 0.5))::numeric, 6)::float AS lat,
+              ROUND(ST_X(ST_LineInterpolatePoint(geom, 0.5))::numeric, 6)::float AS lng
        FROM segmen_kondisi WHERE idruas = $1 ORDER BY km_awal, id`, [id]),
   ]);
   if (ruas.rowCount === 0) return res.status(404).json({ galat: `Ruas "${id}" tidak ditemukan.` });
   const { geom, x_min, y_min, x_maks, y_maks, ...atribut } = ruas.rows[0];
   res.json({ ...atribut, bbox: [x_min, y_min, x_maks, y_maks], geometri: JSON.parse(geom), segmen: segmen.rows });
 }));
-
 // Peringkat ruas dengan IRI rata-rata tertinggi (terburuk)
 app.get("/api/ruas-terparah", rute(async (req, res) => {
   const batas = ambilAngka(req.query.limit, "limit", { min: 1, maks: 50, bawaan: 10 });
   const r = await pool.query(
-    `SELECT idruas, nm_ruas, kab_kota, iri_rata2::float AS iri_rata2, kondisi,
-            km_rusak_berat::float AS km_rusak_berat, panjang_km::float AS panjang_km
-     FROM ruas_jalan
-     WHERE ($1::text IS NULL OR kab_kota = $1)
-     ORDER BY iri_rata2 DESC NULLS LAST, km_rusak_berat DESC
+    `SELECT r.idruas, r.nm_ruas, r.kab_kota, r.iri_rata2::float AS iri_rata2, r.kondisi,
+            a.km_rusak_berat, r.panjang_km::float AS panjang_km
+     FROM ruas_jalan r
+     LEFT JOIN ${AGREGAT_SEGMEN} a ON a.idruas = r.idruas
+     WHERE ($1::text IS NULL OR r.kab_kota = $1)
+     ORDER BY r.iri_rata2 DESC NULLS LAST, a.km_rusak_berat DESC
      LIMIT $2`,
     [ambilTeks(req.query.kab_kota), batas]
   );
   res.json(r.rows);
 }));
-
 // Ringkasan hasil survei (angka utama di panel) - filter: kab_kota
 app.get("/api/ringkasan", rute(async (req, res) => {
   const kab = ambilTeks(req.query.kab_kota);
@@ -257,8 +277,18 @@ app.get("/api/peringkat", rute(async (req, res) => {
   res.json(r.rows);
 }));
 
+// Validasi keakuratan data (hasil di-cache 10 menit karena kuerinya cukup berat)
+let cacheValidasi = null;
+app.get("/api/validasi", rute(async (req, res) => {
+  if (!cacheValidasi || Date.now() - cacheValidasi.waktu > 10 * 60 * 1000) {
+    cacheValidasi = { waktu: Date.now(), isi: await jalankanValidasi(pool) };
+  }
+  res.json(cacheValidasi.isi);
+}));
+
 // ---------------------------------------------------------------- berkas statis
 app.use(express.static(path.join(__dirname, "public"), {
+  extensions: ["html"], // /peta, /dashboard, dst. membuka peta.html, dashboard.html
   setHeaders: (res, berkas) => {
     // pustaka vendor jarang berubah; kode aplikasi selalu dicek ulang agar perubahan langsung terlihat
     res.setHeader("Cache-Control", berkas.includes(`${path.sep}vendor${path.sep}`) ? "public, max-age=86400" : "no-cache");

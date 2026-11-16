@@ -3,11 +3,14 @@
 
 const Peta = (() => {
   let map, tilesAktif, labelAktif, ctrlLegenda;
+  let warnaPilih = "#00E5FF";
+  let ref = { lingkaran: null, akurasi: null, titik: null, halo: [] };
   let lapBatas = null;
   const grupSegmen = L.layerGroup();
   const grupRuas = L.layerGroup();
   const grupSorot = L.layerGroup();
   const grupHasil = L.layerGroup();
+  const grupLokasi = L.layerGroup();
   const hasilPerId = new Map();
   let tokenSegmen = 0, tokenRuas = 0;
   let rSegmen = null;
@@ -19,18 +22,35 @@ const Peta = (() => {
   const tebalSekarang = () => tebal(map.getZoom());
 
   const gayaSegmen = (f) => ({ color: INFO[f.properties.kondisi].warna, weight: tebalSekarang(), opacity: 1, lineCap: "round", lineJoin: "round" });
-  const gayaBayang = () => ({ color: "#0b0e11", weight: tebalSekarang() + 2.6, opacity: 0.7, lineCap: "round", lineJoin: "round" });
+  const gayaBayang = () => ({ color: warnaTema("bayang-jalan"), weight: tebalSekarang() + 2.6, opacity: 0.7, lineCap: "round", lineJoin: "round" });
   const gayaRuas = (f) => ({ color: INFO[f.properties.kondisi].warna, weight: Math.max(1.5, tebalSekarang() - 1), opacity: 0.9, lineCap: "round" });
-  const gayaSorot = () => ({ color: "#ffffff", weight: tebalSekarang() + 6, opacity: 0.95, lineCap: "round", lineJoin: "round" });
+  const gayaSorot = () => ({ color: warnaTema("aksen"), weight: tebalSekarang() + 6, opacity: 0.95, lineCap: "round", lineJoin: "round" });
 
-  function isiPopup(p) {
+  // arah segmen (titik awal ke titik akhir garis), agar kamera Street View menghadap sepanjang jalan
+  const arahSegmen = (g) => {
+    const c = g && g.type === "LineString" ? g.coordinates : null;
+    return c && c.length > 1 ? arahKe({ lat: c[0][1], lng: c[0][0] }, { lat: c[c.length - 1][1], lng: c[c.length - 1][0] }) : 0;
+  };
+
+  // Pop-up segmen: Street View asli di titik yang diklik (ilustrasi hanya dipakai bila titik tidak diketahui)
+  function isiPopup(p, latlng, arah = 0) {
     const k = INFO[p.kondisi];
-    return `<div class="pop-nama">${esc(p.nm_ruas)}</div>
+    const sv = latlng
+      ? `<a class="tombol" href="${urlStreetView(latlng.lat, latlng.lng)}" target="_blank" rel="noopener noreferrer" title="Buka Street View di tab baru">Layar penuh</a>`
+      : "";
+    const foto = latlng
+      ? `<div class="pop-sv"><iframe src="${urlStreetViewSemat(latlng.lat, latlng.lng, arah)}" title="Google Street View ${esc(p.nm_ruas)}"
+           referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
+         <div class="pop-cap">Google Street View, tanggal foto berbeda dengan survei 2021</div>`
+      : `<img class="pop-foto" src="${k.gambar}" alt="Ilustrasi jalan kondisi ${k.nama.toLowerCase()}">
+         <div class="pop-cap">Ilustrasi umum kondisi ${k.nama.toLowerCase()}, bukan foto ruas ini</div>`;
+    return `${foto}
+      <div class="pop-nama">${esc(p.nm_ruas)}</div>
       <div class="pop-kab">${esc(judul(p.kab_kota))}</div>
       <div class="pop-baris"><span>Segmen</span><span>Km ${fmt(p.km_awal, 1)} - ${fmt(p.km_akhir, 1)}</span></div>
       <div class="pop-baris"><span>Nilai IRI</span><span>${fmt(p.nilai_iri, 2)} m/km</span></div>
       <div class="pop-baris"><span>Kondisi</span><span class="chip" style="background:${k.warna};color:${k.teks}">${k.nama}</span></div>
-      <div class="pop-aksi"><button type="button" class="tombol" data-aksi="detail" data-id="${esc(p.idruas)}">Lihat detail ruas</button></div>`;
+      <div class="pop-aksi"><button type="button" class="tombol" data-aksi="detail" data-id="${esc(p.idruas)}">Lihat detail ruas</button>${sv}</div>`;
   }
 
   function kaitkan(feature, layer, aksiKlik) {
@@ -57,9 +77,10 @@ const Peta = (() => {
     });
 
     rSegmen = L.canvas({ pane: "segmen", padding: 0.4, tolerance: 6 });
-    ubahDasar("gelap");
+    ubahDasar(temaTerang() ? "terang" : "gelap");
     grupSorot.addTo(map);
     grupHasil.addTo(map);
+    grupLokasi.addTo(map);
     grupSegmen.addTo(map);
 
     // legenda
@@ -95,21 +116,30 @@ const Peta = (() => {
 
     // tombol "Lihat detail ruas" di pop-up
     map.on("popupopen", (e) => {
+      map.eachLayer((l) => l.closeTooltip && l.closeTooltip()); // tooltip hover tidak menimpa pop-up
       const tombol = e.popup.getElement()?.querySelector('[data-aksi="detail"]');
       if (tombol) tombol.addEventListener("click", () => { kembali.detail(tombol.dataset.id); map.closePopup(); });
     });
 
-    map.on("zoomend", () => {
-      grupSegmen.eachLayer((g) => g.setStyle && g.eachLayer && g.setStyle(g.options.style));
-      grupRuas.eachLayer((g) => g.setStyle && g.setStyle(g.options.style));
-      grupSorot.eachLayer((g) => g.setStyle && g.setStyle(gayaSorot));
-      grupHasil.eachLayer((g) => g.options && g.options.dinamis && g.setStyle(g.options.style));
-    });
+    map.on("zoomend", segarkanGaya);
     return map;
+  }
+
+  // gambar ulang gaya garis (dipakai saat zoom berubah dan saat tema berganti)
+  function segarkanGaya() {
+    grupSegmen.eachLayer((g) => g.setStyle && g.eachLayer && g.setStyle(g.options.style));
+    grupRuas.eachLayer((g) => g.setStyle && g.setStyle(g.options.style));
+    grupSorot.eachLayer((g) => g.setStyle && g.setStyle(gayaSorot));
+    grupHasil.eachLayer((g) => g.options && g.options.dinamis && g.setStyle(g.options.style));
+    ref.halo.forEach((h) => h.setStyle(h.options.style));
   }
 
   function ubahDasar(kunci) {
     const d = PETA_DASAR[kunci];
+    warnaPilih = d.pilih;
+    document.documentElement.style.setProperty("--pilih", warnaPilih);
+    document.documentElement.style.setProperty("--pilih-teks", d.teksPilih);
+    terapkanWarnaPilih();
     if (tilesAktif) map.removeLayer(tilesAktif);
     if (labelAktif) { map.removeLayer(labelAktif); labelAktif = null; }
     tilesAktif = L.tileLayer(d.url, d.opsi).addTo(map);
@@ -133,13 +163,14 @@ const Peta = (() => {
     const segmen = L.geoJSON(data, {
       pane: "segmen", renderer: rSegmen, style: gayaSegmen,
       onEachFeature: (f, layer) => kaitkan(f, layer, (e, p) => {
-        L.popup({ maxWidth: 300, className: "pop" }).setLatLng(e.latlng).setContent(isiPopup(p)).openOn(map);
+        L.popup({ maxWidth: 300, className: "pop" }).setLatLng(e.latlng).setContent(isiPopup(p, e.latlng, arahSegmen(f.geometry))).openOn(map);
         kembali.pilihRuas(p.idruas, e.latlng);
       }),
     });
     grupSegmen.clearLayers();
     grupSegmen.addLayer(bayang);
     grupSegmen.addLayer(segmen);
+    grupHasil.eachLayer((l) => l.options && l.options.dinamis && l.bringToFront());
     return { data, batas: segmen.getBounds() };
   }
 
@@ -148,11 +179,12 @@ const Peta = (() => {
     const data = await api("/api/ruas", params);
     if (token !== tokenRuas) return;
     const lap = L.geoJSON(data, {
-      pane: "ruas", style: gayaRuas,
+      pane: "segmen", renderer: rSegmen, style: gayaRuas,
       onEachFeature: (f, layer) => kaitkan(f, layer, (e, p) => kembali.pilihRuas(p.idruas, e.latlng)),
     });
     grupRuas.clearLayers();
     grupRuas.addLayer(lap);
+    lap.bringToBack(); // ruas digambar di bawah segmen
   }
 
   function atur(nama, nyala) {
@@ -160,9 +192,11 @@ const Peta = (() => {
     const grup = { segmen: grupSegmen, ruas: grupRuas, batas: lapBatas }[nama];
     if (!grup) return;
     if (nyala) grup.addTo(map); else map.removeLayer(grup);
+    if (nama === "ruas" && nyala) grupRuas.eachLayer((l) => l.bringToBack && l.bringToBack());
   }
 
-  const bukaPopupSegmen = (latlng, props) => L.popup({ maxWidth: 300 }).setLatLng(latlng).setContent(isiPopup(props)).openOn(map);
+  const bukaPopupSegmen = (latlng, props, arah = 0) =>
+    L.popup({ maxWidth: 300, className: "pop" }).setLatLng(latlng).setContent(isiPopup(props, latlng, arah)).openOn(map);
 
   function sorotRuas(geometri) {
     grupSorot.clearLayers();
@@ -177,41 +211,70 @@ const Peta = (() => {
   function pilihTitik(aksi) { aksiKlikTitik = aksi; map.getContainer().classList.add("mode-titik"); }
   function batalPilihTitik() { aksiKlikTitik = null; map.getContainer().classList.remove("mode-titik"); }
 
-  function tampilHasil(data) {
+  // gaya seleksi: semuanya memakai warna "berlawanan" (warnaPilih)
+  const gayaLingkaran = () => ({ color: warnaPilih, weight: 2.5, opacity: 1, dashArray: "8 6", fillColor: warnaPilih, fillOpacity: 0.1 });
+  const gayaAkurasi = () => ({ color: warnaPilih, weight: 1, opacity: 0.55, fillColor: warnaPilih, fillOpacity: 0.07 });
+  const gayaTitik = () => ({ color: "#ffffff", weight: 2.5, fillColor: warnaPilih, fillOpacity: 1, radius: 7 });
+  const gayaHalo = () => ({ color: warnaPilih, weight: tebalSekarang() + 7, opacity: 0.85, lineCap: "round", lineJoin: "round" });
+
+  function terapkanWarnaPilih() {
+    if (ref.lingkaran) ref.lingkaran.setStyle(gayaLingkaran());
+    if (ref.akurasi) ref.akurasi.setStyle(gayaAkurasi());
+    if (ref.titik) ref.titik.setStyle(gayaTitik());
+    ref.halo.forEach((h) => h.setStyle(h.options.style));
+  }
+
+  // opsi.akurasi (meter) = lingkaran ketidakpastian lokasi GPS; opsi.fit = geser peta ke area hasil
+  function tampilHasil(data, { akurasi = null, fit = true } = {}) {
     grupHasil.clearLayers();
+    grupLokasi.clearLayers();
     hasilPerId.clear();
+    ref = { lingkaran: null, akurasi: null, titik: null, halo: [] };
     const c = [data.pusat.lat, data.pusat.lng];
-    grupHasil.addLayer(L.circle(c, { pane: "hasil", radius: data.radius_m, color: "#fff", weight: 1.5, dashArray: "6 6", fillColor: "#fff", fillOpacity: 0.05, interactive: false }));
-    grupHasil.addLayer(L.circleMarker(c, { pane: "hasil", radius: 6, color: "#1E2329", weight: 2, fillColor: "#fff", fillOpacity: 1, interactive: false }));
+    ref.lingkaran = L.circle(c, { pane: "hasil", radius: data.radius_m, interactive: false, ...gayaLingkaran() });
+    grupHasil.addLayer(ref.lingkaran);
+    if (akurasi && akurasi > 1) {
+      ref.akurasi = L.circle(c, { pane: "hasil", radius: akurasi, interactive: false, ...gayaAkurasi() });
+      grupLokasi.addLayer(ref.akurasi);
+    }
+    ref.titik = L.circleMarker(c, { pane: "hasil", interactive: false, ...gayaTitik() });
+    grupLokasi.addLayer(ref.titik);
     for (const f of data.features) {
-      const gayaHalo = () => ({ color: "#fff", weight: tebalSekarang() + 6, opacity: 0.9, lineCap: "round" });
       const gayaGaris = () => ({ color: INFO[f.properties.kondisi].warna, weight: tebalSekarang() + 1, opacity: 1, lineCap: "round" });
       const halo = L.geoJSON(f, { pane: "sorot", interactive: false, style: gayaHalo });
-      const garis = L.geoJSON(f, { pane: "hasil", style: gayaGaris });
-      halo.options.dinamis = true;
+      const garis = L.geoJSON(f, { pane: "segmen", renderer: rSegmen, style: gayaGaris });
       garis.options.dinamis = true;
       garis.on("click", (e) => {
         if (aksiKlikTitik) return;
         L.DomEvent.stopPropagation(e);
-        bukaPopupSegmen(e.latlng, f.properties);
+        bukaPopupSegmen(e.latlng, f.properties, arahSegmen(f.geometry));
       });
       grupHasil.addLayer(halo); grupHasil.addLayer(garis);
+      garis.bringToFront();
+      ref.halo.push(halo);
       hasilPerId.set(f.id, garis);
     }
-    map.fitBounds(L.latLng(c).toBounds(data.radius_m * 2), { padding: [30, 30] });
+    if (fit) map.fitBounds(L.latLng(c).toBounds(data.radius_m * 2), { padding: [30, 30] });
   }
-  function bersihHasil() { grupHasil.clearLayers(); hasilPerId.clear(); }
+  function bersihHasil() {
+    grupHasil.clearLayers(); grupLokasi.clearLayers(); hasilPerId.clear();
+    ref = { lingkaran: null, akurasi: null, titik: null, halo: [] };
+  }
   function fokusHasil(id) {
     const g = hasilPerId.get(id);
     if (!g) return;
+    const garis = g.getLayers()[0];
+    const titik = garis.getLatLngs();
+    // pop-up dibuka setelah peta selesai bergeser, agar geser-otomatisnya tidak bentrok dengan animasi zoom
+    map.once("moveend", () =>
+      bukaPopupSegmen(titik[Math.floor(titik.length / 2)], garis.feature.properties, arahSegmen(garis.feature.geometry))); // titik di jalan
     map.fitBounds(g.getBounds(), { padding: [80, 80], maxZoom: 15 });
-    const f = g.getLayers()[0].feature;
-    bukaPopupSegmen(g.getBounds().getCenter(), f.properties);
   }
+  const jarakMeter = (a, b) => map.distance([a.lat, a.lng], [b.lat, b.lng]);
 
   const ukuran = () => map && map.invalidateSize();
 
-  return { init, ubahDasar, muatBatas, muatSegmen, muatRuas, atur, sorotRuas, zoomKe, zoomBatas, bukaPopupSegmen,
-           pilihTitik, batalPilihTitik, tampilHasil, bersihHasil, fokusHasil, ukuran,
+  return { init, ubahDasar, segarkanGaya, muatBatas, muatSegmen, muatRuas, atur, sorotRuas, zoomKe, zoomBatas, bukaPopupSegmen,
+           pilihTitik, batalPilihTitik, tampilHasil, bersihHasil, fokusHasil, jarakMeter, ukuran,
            get peta() { return map; } };
 })();

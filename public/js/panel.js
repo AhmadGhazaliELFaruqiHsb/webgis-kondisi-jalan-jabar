@@ -1,10 +1,8 @@
 "use strict";
 // Panel samping: filter, ringkasan, grafik (Chart.js), pencarian ruas, detail ruas, dan alat titik.
 
-Chart.defaults.color = "#A9B2BC";
 Chart.defaults.font.family = '"Barlow", system-ui, sans-serif';
 Chart.defaults.font.size = 12;
-Chart.defaults.borderColor = "#3A434E";
 
 const S = {
   kondisi: new Set(KONDISI.map((k) => k.nama)),
@@ -18,6 +16,7 @@ const S = {
   lapisanRuas: false,
   modeTitik: false,
   titik: null,
+  lokasi: null,
   batasJabar: null,
 };
 const $ = (id) => document.getElementById(id);
@@ -62,6 +61,7 @@ function bangunKondisi() {
        <input type="checkbox" data-k="${k.nama}" checked>
        <span class="petak" style="background:${k.warna}"><svg style="stroke:${k.teks}" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l3 3 5-6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
        <span class="nama">${k.nama}<small>${k.rentang}</small></span>
+       <img class="mini-foto" src="${k.gambar}" alt="" width="64" height="40" loading="lazy">
        <span class="nilai"><span data-km>–</span><small data-pct>–</small></span>
      </label>`).join("");
   $("komposisi").addEventListener("click", (e) => {
@@ -202,7 +202,7 @@ const garisAmbang = {
   afterDraw(chart) {
     const { ctx, chartArea: { left, right }, scales: { y } } = chart;
     ctx.save();
-    ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.4)";
+    ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.strokeStyle = warnaTema("garis-ambang");
     [4, 8, 12].forEach((v) => {
       if (v > y.max) return;
       const py = y.getPixelForValue(v);
@@ -218,13 +218,19 @@ function gambarDetail(d) {
   const km = [d.km_baik, d.km_sedang, d.km_rusak_ringan, d.km_rusak_berat];
   $("detailRuas").innerHTML = `
     <article class="detail">
+      <figure class="foto-kondisi sv">
+        <div class="sv-bingkai"><iframe id="svRuas" title="Google Street View ruas ${esc(d.nm_ruas)}" loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
+        <figcaption id="svKet"></figcaption>
+      </figure>
       <span class="chip" style="background:${k.warna};color:${k.teks}">${k.nama}</span>
       <h2>${esc(d.nm_ruas)}</h2>
       <p class="meta">Kode ${esc(d.idruas)}, ${esc(judul(d.kab_kota))}${d.uptd ? `, UPTD ${esc(d.uptd)}` : ""}</p>
-      <dl class="tiga">
-        <div><dt>Panjang</dt><dd>${fmt(d.panjang_km, 2)} km</dd></div>
+      <dl class="tiga empat">
+        <div><dt>Panjang resmi</dt><dd>${fmt(d.panjang_km, 2)} km</dd></div>
+        <div><dt>Panjang tersurvei</dt><dd>${fmt(d.km_survei, 2)} km</dd></div>
         <div><dt>IRI rata-rata</dt><dd>${fmt(d.iri_rata2, 2)}</dd></div>
-        <div><dt>Mantap</dt><dd>${fmt(d.persen_mantap, 0)}%</dd></div>
+        <div><dt>Jalan mantap</dt><dd>${fmt(d.persen_mantap, 0)}%</dd></div>
       </dl>
       <h3>Panjang tersurvei menurut kondisi</h3>
       <div class="km-bar" role="img" aria-label="Komposisi kondisi ruas">
@@ -235,7 +241,7 @@ function gambarDetail(d) {
       </ul>
       <h3>Profil IRI sepanjang ruas</h3>
       <div class="kotak-grafik"><canvas id="cProfil" role="img" aria-label="Nilai IRI tiap segmen sepanjang ruas"></canvas></div>
-      <p class="sumber">Setiap batang adalah satu segmen. Garis putus-putus menandai batas kelas pada IRI 4, 8, dan 12.</p>
+      <p class="sumber">Setiap batang adalah satu segmen. Garis putus-putus menandai batas kelas pada IRI 4, 8, dan 12. Panjang per kondisi dan persen mantap dihitung dari segmen 1 km, sama seperti di peta.</p>
       <div class="aksi-detail">
         <button type="button" class="tombol tombol-isi" id="btnZoomRuas">Zoom ke ruas</button>
         <button type="button" class="tombol" id="btnLepas">Hapus sorotan</button>
@@ -267,12 +273,40 @@ function gambarDetail(d) {
           callbacks: {
             title: (it) => { const s = d.segmen[it[0].dataIndex]; return `Km ${fmt(s.km_awal, 1)} - ${fmt(s.km_akhir, 1)}`; },
             label: (it) => { const s = d.segmen[it.dataIndex]; return `IRI ${fmt(s.nilai_iri, 2)}, ${s.kondisi}`; },
+            footer: () => "Klik untuk melihat Street View",
           },
         },
       },
+      onClick: (e, el) => { if (el.length) tampilStreetView(d, el[0].index); },
+      onHover: (e, el) => { e.native.target.style.cursor = el.length ? "pointer" : "default"; },
     },
     plugins: [garisAmbang],
   });
+  // awalnya tampilkan segmen dengan IRI tertinggi (bagian paling rusak)
+  const terparah = d.segmen.reduce((m, s, i, a) => (s.nilai_iri > a[m].nilai_iri ? i : m), 0);
+  tampilStreetView(d, terparah, "Segmen paling rusak:");
+}
+
+// Street View segmen ke-i di panel Ruas, dan tandai batangnya di grafik profil
+function tampilStreetView(d, i, judulSegmen = "Segmen:") {
+  const s = d.segmen[i];
+  if (!s || s.lat == null) return;
+  const tetangga = d.segmen[i + 1] || d.segmen[i - 1];
+  const arah = tetangga ? (d.segmen[i + 1] ? arahKe(s, tetangga) : arahKe(tetangga, s)) : 0;
+  $("svRuas").src = urlStreetViewSemat(s.lat, s.lng, arah);
+  const k = INFO[s.kondisi];
+  $("svKet").innerHTML =
+    `<b>${judulSegmen}</b> Km ${fmt(s.km_awal, 1)} - ${fmt(s.km_akhir, 1)}, IRI ${fmt(s.nilai_iri, 2)}
+     <span class="titik" style="background:${k.warna}"></span> ${k.nama}.
+     <a href="${urlStreetView(s.lat, s.lng)}" target="_blank" rel="noopener noreferrer">Buka layar penuh</a><br>
+     Foto dari Google Street View, tanggalnya berbeda dengan survei 2021. Bila kosong, lokasi ini belum dipotret Google.
+     Klik batang pada grafik profil untuk melihat segmen lain.`;
+  if (grafik.profil) {
+    const ds = grafik.profil.data.datasets[0];
+    ds.borderWidth = d.segmen.map((_, j) => (j === i ? 2 : 0));
+    ds.borderColor = warnaTema("aksen");
+    grafik.profil.update("none");
+  }
 }
 
 // ---------------------------------------------------------------- analisis
@@ -292,37 +326,52 @@ async function muatAnalisis() {
   } catch (e) { S.analisisKotor = true; pesan(e.message, 7000); }
 }
 
+// Tren dipecah menjadi satu grafik per kondisi (bukan batang bertumpuk), masing-masing dengan skala sumbu Y
+// sendiri, agar perubahan kelas yang kecil (rusak ringan, rusak berat) tetap terlihat.
 function gambarTren(data) {
-  if (grafik.tren) grafik.tren.destroy();
+  (grafik.tren || []).forEach((g) => g.destroy());
   const terakhir = data[data.length - 1];
   $("ketTren").textContent = terakhir
-    ? `Pada ${terakhir.tahun}, ${fmt(terakhir.persen_mantap, 1)}% jalan berkondisi mantap (baik dan sedang).`
+    ? `Pada ${terakhir.tahun}, ${fmt(terakhir.persen_mantap, 1)}% jalan berkondisi mantap (baik dan sedang). Skala tiap grafik berbeda.`
     : "Belum ada data.";
-  grafik.tren = new Chart($("cTren"), {
-    type: "bar",
-    data: {
-      labels: data.map((d) => d.tahun),
-      datasets: KONDISI.map((k) => ({
-        label: k.nama, backgroundColor: k.warna, borderWidth: 0,
-        data: data.map((d) => (d.total_km ? (d.km[k.nama] / d.total_km) * 100 : 0)),
-      })),
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, max: 100, ticks: { callback: (v) => v + "%" } } },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${fmt(it.parsed.y, 1)}% (${fmt(data[it.dataIndex].km[it.dataset.label], 1)} km)` } },
+  const persen = (d, nama) => (d.total_km ? (d.km[nama] / d.total_km) * 100 : 0);
+  $("trenGrid").innerHTML = KONDISI.map((k, i) => {
+    const nilai = data.map((d) => persen(d, k.nama));
+    const ubah = nilai.length > 1 ? nilai[nilai.length - 1] - nilai[0] : 0;
+    return `<figure class="tren-kartu">
+      <figcaption><span><i class="titik" style="background:${k.warna}"></i>${k.nama}</span>
+        <b>${fmt(nilai[nilai.length - 1] ?? 0, 1)}%</b></figcaption>
+      <p class="tren-ubah">${data.length > 1 ? `${ubah > 0 ? "+" : ""}${fmt(ubah, 1)} poin sejak ${data[0].tahun}` : ""}</p>
+      <div class="kotak-grafik kecil"><canvas id="cTren${i}" role="img" aria-label="Grafik persentase jalan ${k.nama.toLowerCase()} tiap tahun"></canvas></div>
+    </figure>`;
+  }).join("");
+  grafik.tren = KONDISI.map((k, i) => {
+    const nilai = data.map((d) => persen(d, k.nama));
+    const maks = Math.min(100, Math.max(5, Math.ceil((Math.max(...nilai, 0) * 1.15) / 5) * 5));
+    return new Chart($(`cTren${i}`), {
+      type: "bar",
+      data: { labels: data.map((d) => d.tahun), datasets: [{ label: k.nama, data: nilai, backgroundColor: k.warna, borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, padding: 0, font: { size: 9 }, callback: (v, j) => `'${String(data[j].tahun).slice(2)}` } },
+          y: { min: 0, max: maks, ticks: { maxTicksLimit: 4, font: { size: 10 }, callback: (v) => v + "%" } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: (its) => String(data[its[0].dataIndex].tahun), label: (it) => `${k.nama}: ${fmt(it.parsed.y, 1)}% (${fmt(data[it.dataIndex].km[k.nama], 1)} km)` } },
+        },
       },
-    },
+    });
   });
 }
 
 function gambarParah(data) {
   $("daftarParah").innerHTML = data.length
-    ? data.map((r) => {
+    ? data.map((r, i) => {
         const k = INFO[r.kondisi];
         return `<li><button type="button" data-id="${esc(r.idruas)}">
+          <span class="no">${i + 1}</span>
           <span class="nm">${esc(r.nm_ruas)}</span>
           <span class="kab">${esc(judul(r.kab_kota))}</span>
           <span class="iri">${fmt(r.iri_rata2, 2)}<i style="width:${Math.min(100, (r.iri_rata2 / 16) * 100)}%;background:${k.warna}"></i></span>
@@ -339,24 +388,33 @@ async function muatPeringkat() {
 function gambarPeringkat() {
   const urut = [...S.peringkat].sort((a, b) =>
     (S.urutNaik ? 1 : -1) * ((a.persen_mantap ?? -1) - (b.persen_mantap ?? -1)) || a.kab_kota.localeCompare(b.kab_kota));
-  $("tabelPeringkat").querySelector("tbody").innerHTML = urut.map((r) => `
+  $("tabelPeringkat").querySelector("tbody").innerHTML = urut.map((r, i) => `
     <tr tabindex="0" data-kab="${esc(r.kab_kota)}" ${r.kab_kota === S.kab ? 'aria-current="true" style="background:var(--tinta-3)"' : ""}>
-      <td>${esc(judul(r.kab_kota))}</td>
+      <td class="no">${i + 1}</td>
+      <td>${esc(judul(r.kab_kota).replace(/^Kabupaten /, "Kab. "))}</td>
       <td class="num"><span class="sel-mantap"><i><b style="width:${r.persen_mantap ?? 0}%"></b></i>${fmt(r.persen_mantap, 1)}%</span></td>
-      <td class="num">${fmt(r.km_rusak_berat, 1)} km</td>
+      <td class="num">${fmt(r.km_rusak_berat, 1)}</td>
     </tr>`).join("");
   $("btnUrut").textContent = S.urutNaik ? "Urutkan dari yang tertinggi" : "Urutkan dari yang terendah";
 }
 
 // ---------------------------------------------------------------- alat: jalan rusak di sekitar titik
-function infoTerdekat(teks, bisaHapus = false) {
+function infoTerdekat(teks, { hapus = false, catatan = "" } = {}) {
   const e = $("infoTerdekat");
   e.textContent = teks;
-  if (bisaHapus) {
+  if (hapus) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "tombol tombol-kecil"; b.textContent = "Hapus hasil"; b.style.marginLeft = "8px";
-    b.addEventListener("click", () => { Peta.bersihHasil(); $("hasilTerdekat").innerHTML = ""; e.textContent = ""; S.titik = null; });
+    b.addEventListener("click", () => {
+      Peta.bersihHasil(); hentikanPantau();
+      $("hasilTerdekat").innerHTML = ""; e.textContent = ""; S.titik = null;
+    });
     e.appendChild(b);
+  }
+  if (catatan) {
+    const c = document.createElement("span");
+    c.className = "catatan-lokasi"; c.textContent = catatan;
+    e.appendChild(c);
   }
 }
 
@@ -368,19 +426,22 @@ function selesaiPilihTitik() {
   b.textContent = "Pilih titik di peta";
 }
 
-async function cariTerdekat(lat, lng) {
-  S.titik = { lat, lng };
-  infoTerdekat("Mencari...");
+// opsi.akurasi: ketidakpastian lokasi (m); opsi.catatan: teks tambahan; opsi.fit: geser peta ke hasil
+async function cariTerdekat(lat, lng, { akurasi = null, catatan = "", fit = true } = {}) {
+  S.titik = { lat, lng, akurasi };
+  if (!catatan) infoTerdekat("Mencari...");
   try {
     const radius = Number($("radius").value);
     const d = await api("/api/terdekat", { lat, lng, radius, limit: 30 });
-    Peta.tampilHasil(d);
+    Peta.tampilHasil(d, { akurasi, fit });
     const n = d.features.length;
+    let cat = catatan;
+    if (akurasi && akurasi > radius) cat += `${cat ? " " : ""}Akurasi lokasi lebih besar dari radius, jadi hasil kurang tepat. Tunggu perbaikan lokasi atau pilih titik langsung di peta.`;
     infoTerdekat(
       n === 0
         ? `Tidak ada segmen rusak dalam radius ${fmt(radius / 1000, 0)} km dari titik ini. Coba perbesar radius.`
         : `${n} segmen rusak${n === 30 ? " (30 yang terdekat)" : ""} dalam radius ${fmt(radius / 1000, 0)} km.`,
-      true
+      { hapus: true, catatan: cat }
     );
     $("hasilTerdekat").innerHTML = d.features.map((f) => {
       const p = f.properties, k = INFO[p.kondisi];
@@ -394,6 +455,107 @@ async function cariTerdekat(lat, lng) {
   } catch (e) { infoTerdekat(e.message); }
 }
 
+// ---------- lokasi saya
+// Penyebab "delay": peramban butuh beberapa detik menentukan posisi (Wi-Fi/IP/GPS), bukan kueri database (sekitar 15 ms).
+// Strategi: (1) umpan balik seketika, (2) pakai posisi tersimpan bila masih segar, (3) tampilkan hasil dari
+// posisi kasar lebih dulu, lalu (4) diperbaiki di latar belakang saat GPS/Wi-Fi memberi posisi lebih akurat.
+const UMUR_LOKASI = 5 * 60 * 1000;
+const OPSI_CEPAT = { enableHighAccuracy: false, maximumAge: UMUR_LOKASI, timeout: 8000 };
+const OPSI_AKURAT = { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 };
+let idPantau = null, timerPantau = null;
+
+function sibukLokasi(sibuk) {
+  const b = $("btnLokasi");
+  b.disabled = sibuk;
+  b.setAttribute("aria-busy", String(sibuk));
+  b.classList.toggle("memuat", sibuk);
+  b.textContent = sibuk ? "Mencari lokasi" : "Lokasi saya";
+}
+
+function simpanLokasi(pos) {
+  S.lokasi = { lat: pos.coords.latitude, lng: pos.coords.longitude, akurasi: pos.coords.accuracy, waktu: Date.now() };
+  return S.lokasi;
+}
+
+function hentikanPantau() {
+  if (idPantau !== null) { navigator.geolocation.clearWatch(idPantau); idPantau = null; }
+  clearTimeout(timerPantau);
+}
+
+function galatLokasi(err) {
+  const pesanGalat = {
+    1: "Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini (ikon di kolom alamat), lalu coba lagi.",
+    2: "Posisi tidak dapat ditentukan. Pastikan layanan lokasi perangkat aktif, atau pilih titik langsung di peta.",
+    3: "Penentuan lokasi terlalu lama. Coba lagi, atau pilih titik langsung di peta.",
+  };
+  infoTerdekat(pesanGalat[err.code] || "Lokasi tidak dapat diakses. Pilih titik langsung di peta.");
+}
+
+async function tampilkanLokasi(lok, ket, { fit = true } = {}) {
+  await cariTerdekat(lok.lat, lok.lng, { akurasi: lok.akurasi, fit, catatan: `Lokasi Anda ${ket}; akurasi sekitar ${jarak(Math.round(lok.akurasi))}.` });
+}
+
+// perbaiki posisi di latar belakang bila akurasi awal masih kasar
+function perbaikiLokasi() {
+  if (!S.lokasi || S.lokasi.akurasi <= 100 || idPantau !== null) return;
+  let terbaik = S.lokasi.akurasi;
+  timerPantau = setTimeout(hentikanPantau, 20000);
+  idPantau = navigator.geolocation.watchPosition(
+    (pos) => {
+      if (pos.coords.accuracy < terbaik * 0.7) {
+        const lama = S.lokasi;
+        terbaik = pos.coords.accuracy;
+        const baru = simpanLokasi(pos);
+        const geser = Peta.jarakMeter(lama, baru) > Number($("radius").value) * 0.25; // pindah jauh: geser peta juga
+        tampilkanLokasi(baru, "diperbarui", { fit: geser });
+      }
+      if (pos.coords.accuracy <= 50) hentikanPantau();
+    },
+    () => hentikanPantau(),
+    OPSI_AKURAT
+  );
+}
+
+function lokasiSaya() {
+  if (!window.isSecureContext) {
+    infoTerdekat("Lokasi hanya dapat dipakai lewat https atau alamat http://localhost:3000. Buka web ini dari localhost.");
+    return;
+  }
+  if (!navigator.geolocation) { infoTerdekat("Peramban ini tidak mendukung geolokasi."); return; }
+
+  // posisi tersimpan masih segar: tampil seketika
+  if (S.lokasi && Date.now() - S.lokasi.waktu < UMUR_LOKASI) {
+    tampilkanLokasi(S.lokasi, "(posisi terakhir)");
+    perbaikiLokasi();
+    return;
+  }
+
+  sibukLokasi(true);
+  infoTerdekat("Mencari lokasi Anda. Peramban sedang menentukan posisi, ini bisa memakan beberapa detik.");
+  const mulai = performance.now();
+  const berhasil = (pos) => {
+    sibukLokasi(false);
+    const dtk = fmt((performance.now() - mulai) / 1000, 1);
+    tampilkanLokasi(simpanLokasi(pos), `ditemukan dalam ${dtk} detik`);
+    perbaikiLokasi();
+  };
+  navigator.geolocation.getCurrentPosition(berhasil, (err) => {
+    if (err.code === 3) { // terlalu lama: coba dengan GPS
+      infoTerdekat("Penentuan cepat terlalu lama, mencoba dengan GPS...");
+      navigator.geolocation.getCurrentPosition(berhasil, (e2) => { sibukLokasi(false); galatLokasi(e2); }, OPSI_AKURAT);
+    } else { sibukLokasi(false); galatLokasi(err); }
+  }, OPSI_CEPAT);
+}
+
+// bila izin lokasi sudah pernah diberikan, hangatkan cache posisi agar klik pertama langsung cepat
+async function panaskanLokasi() {
+  try {
+    if (!navigator.permissions || !navigator.geolocation || !window.isSecureContext) return;
+    const izin = await navigator.permissions.query({ name: "geolocation" });
+    if (izin.state === "granted") navigator.geolocation.getCurrentPosition(simpanLokasi, () => {}, { ...OPSI_CEPAT, timeout: 15000 });
+  } catch { /* tidak masalah: hanya optimasi */ }
+}
+
 function pasangTerdekat() {
   const btn = $("btnTitik");
   btn.addEventListener("click", () => {
@@ -402,19 +564,12 @@ function pasangTerdekat() {
     btn.setAttribute("aria-pressed", "true");
     btn.textContent = "Klik titik di peta (batalkan)";
     infoTerdekat("Klik di mana saja pada peta.");
+    hentikanPantau();
     Peta.pilihTitik((ll) => { selesaiPilihTitik(); cariTerdekat(ll.lat, ll.lng); });
     if (mobile()) bukaSheet(false);
   });
-  $("btnLokasi").addEventListener("click", () => {
-    if (!navigator.geolocation) { infoTerdekat("Peramban ini tidak mendukung geolokasi."); return; }
-    infoTerdekat("Mencari lokasi Anda...");
-    navigator.geolocation.getCurrentPosition(
-      (p) => cariTerdekat(p.coords.latitude, p.coords.longitude),
-      () => infoTerdekat("Lokasi tidak dapat diakses. Izinkan akses lokasi di peramban, atau pilih titik di peta."),
-      { timeout: 10000 }
-    );
-  });
-  $("radius").addEventListener("change", () => { if (S.titik) cariTerdekat(S.titik.lat, S.titik.lng); });
+  $("btnLokasi").addEventListener("click", lokasiSaya);
+  $("radius").addEventListener("change", () => { if (S.titik) cariTerdekat(S.titik.lat, S.titik.lng, { akurasi: S.titik.akurasi }); });
   $("hasilTerdekat").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-id]");
     if (!b) return;
@@ -423,6 +578,18 @@ function pasangTerdekat() {
     pilihRuas(b.dataset.ruas, { buka: false });
   });
 }
+
+// ---------------------------------------------------------------- tema (tombolnya diatur situs.js)
+// Bagian khusus peta: peta dasar Gelap/Terang ikut tema, gaya garis dan sorotan grafik profil diperbarui
+document.addEventListener("temaberubah", (e) => {
+  const aktif = $("pilihDasar").querySelector('[aria-pressed="true"]');
+  if (aktif && (aktif.dataset.k === "gelap" || aktif.dataset.k === "terang")) $("pilihDasar").querySelector(`[data-k="${e.detail}"]`).click();
+  Peta.segarkanGaya();
+  if (S.ruas && grafik.profil) {
+    const ds = grafik.profil.data.datasets[0];
+    if (ds.borderColor) { ds.borderColor = warnaTema("aksen"); grafik.profil.update("none"); }
+  }
+});
 
 // ---------------------------------------------------------------- pemasangan UI
 function pasangUI() {
@@ -454,7 +621,7 @@ function pasangUI() {
 
   // peta dasar
   $("pilihDasar").innerHTML = Object.entries(PETA_DASAR).map(([k, d]) =>
-    `<button type="button" data-k="${k}" aria-pressed="${k === "gelap"}">${d.nama}</button>`).join("");
+    `<button type="button" data-k="${k}" aria-pressed="${k === (temaTerang() ? "terang" : "gelap")}">${d.nama}</button>`).join("");
   $("pilihDasar").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-k]");
     if (!b) return;
@@ -480,7 +647,6 @@ function pasangUI() {
   });
 
   // kepala
-  $("btnTentang").addEventListener("click", () => $("dlgTentang").showModal());
   $("btnPanel").addEventListener("click", () => bukaSheet(document.body.classList.contains("sisi-tutup")));
   window.addEventListener("resize", () => Peta.ukuran());
   document.addEventListener("keydown", (e) => {
@@ -506,6 +672,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     S.batasJabar = await Peta.muatBatas();
     Peta.zoomBatas(S.batasJabar);
     await Promise.all([muatRingkasan(), muatPeta()]);
+    panaskanLokasi();
+
+    // tautan dari halaman lain: peta.html?kab=KOTA%20BANDUNG atau peta.html?ruas=348000
+    const q = new URLSearchParams(location.search);
+    if (q.get("kab") && meta.kabkota.some((k) => k.nama === q.get("kab"))) await setKab(q.get("kab"));
+    if (q.get("ruas")) await pilihRuas(q.get("ruas"), { zoom: true, buka: true });
   } catch (e) {
     galatFatal(e.message);
   }
