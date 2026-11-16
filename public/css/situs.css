@@ -91,6 +91,7 @@ a.kartu:hover { border-color: var(--redup); transform: translateY(-2px); }
 .validasi-ringkas div { display: flex; align-items: baseline; gap: 8px; }
 .validasi-ringkas strong { font: 700 40px/1 var(--f-judul); }
 .validasi-ringkas span { color: var(--redup); }
+.validasi-ringkas strong small { font-size: 22px; color: var(--redup); }
 .validasi-ringkas .tombol { margin-left: auto; }
 
 /* ---------- halaman teks (Validasi, Tentang) ---------- */
@@ -106,6 +107,12 @@ a.kartu:hover { border-color: var(--redup); transform: translateY(-2px); }
 .halaman-teks .kelas-gambar, .halaman-teks .daftar-cek { padding-left: 0; }
 .halaman-teks .tabel-info td { vertical-align: top; }
 .halaman-teks code { font-size: 13px; padding: 1px 6px; border-radius: 4px; background: var(--tinta-3); }
+.ringkas-dua { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; margin: 18px 0 8px; }
+.ringkas-jenis h2 { margin: 0 0 4px; font: 600 21px/1.2 var(--f-judul); }
+.ringkas-jenis .bantu { margin: 0; }
+.ringkas-jenis .ringkas-validasi { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.ringkas-jenis strong small { font-size: 22px; color: var(--redup); }
+.halaman-teks h2.judul-jenis { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--garis); }
 .anggota { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .anggota li { margin: 0; max-width: none; }
 .anggota strong { display: block; font: 600 19px/1.2 var(--f-judul); }
@@ -119,7 +126,7 @@ a.kartu:hover { border-color: var(--redup); transform: translateY(-2px); }
 @media (max-width: 600px) {
   .halaman { padding: 0 16px; }
   .bagian { padding: 40px 0; }
-  .grid-2, .grid-3, .grid-4, .anggota { grid-template-columns: 1fr; }
+  .grid-2, .grid-3, .grid-4, .anggota, .ringkas-dua { grid-template-columns: 1fr; }
   .hero-kartu .angka-besar { font-size: 76px; }
   .dash-filter, .dash-filter select { width: 100%; min-width: 0; }
   .grafik-peringkat { height: 720px; }

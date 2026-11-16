@@ -272,11 +272,22 @@ async function jalankanValidasi(db) {
     `r = ${fm(korelasi, 2)} pada ${n} Kabupaten/Kota; selisih rata-rata ${fm(selRata, 1)} poin`,
     `Agar survei Roadroid menghasilkan ${fm(gal.mantap, 0)}% jalan mantap, batas mantap harus berada di IRI sekitar ${fm(iriSetara, 1)} (bukan 8). Artinya, dengan batas kelas yang sama, survei Roadroid menilai jalan lebih buruk daripada rekap resmi DBMPR.`);
 
+  // Dua jenis pemeriksaan:
+  //  kebenaran  : menguji apakah data di aplikasi benar dan konsisten (termasuk cek silang dengan olahan DBMPR
+  //               dari survei yang sama)
+  //  pembanding : membandingkan dengan sumber lain yang memakai metode survei berbeda (Galura); selisih di sini
+  //               menunjukkan perbedaan metode, bukan kesalahan data
+  for (const h of hasil) h.jenis = h.kelompok === G5 ? "pembanding" : "kebenaran";
+  const hitung = (daftar) => ({
+    lulus: daftar.filter((h) => h.status === "lulus").length,
+    perhatian: daftar.filter((h) => h.status === "perhatian").length,
+    gagal: daftar.filter((h) => h.status === "gagal").length,
+    total: daftar.length,
+  });
   const ringkasan = {
-    lulus: hasil.filter((h) => h.status === "lulus").length,
-    perhatian: hasil.filter((h) => h.status === "perhatian").length,
-    gagal: hasil.filter((h) => h.status === "gagal").length,
-    total: hasil.length,
+    ...hitung(hasil),
+    kebenaran: hitung(hasil.filter((h) => h.jenis === "kebenaran")),
+    pembanding: hitung(hasil.filter((h) => h.jenis === "pembanding")),
   };
   return {
     dibuat: new Date().toISOString(),
@@ -304,7 +315,10 @@ if (require.main === module) {
         if (p.keterangan) console.log(`      Catatan: ${p.keterangan}`);
       }
       const r = v.ringkasan;
-      console.log(`\nRingkasan: ${r.lulus} lulus, ${r.perhatian} perlu perhatian, ${r.gagal} tidak sesuai, dari ${r.total} pemeriksaan.`);
+      const k = r.kebenaran, b = r.pembanding;
+      console.log(`\nRingkasan`);
+      console.log(`  Uji kebenaran data           : ${k.lulus} lulus, ${k.perhatian} perlu perhatian, ${k.gagal} tidak sesuai, dari ${k.total} pemeriksaan`);
+      console.log(`  Perbandingan dengan Galura   : ${b.lulus} dari ${b.total} sesuai (metode survei berbeda)`);
       console.log(`\nPerbandingan per Kabupaten/Kota (persen jalan mantap, ${v.banding.tahun}):`);
       console.log("  Kabupaten/Kota".padEnd(30) + "Roadroid".padStart(10) + "Galura".padStart(10) + "Selisih".padStart(10));
       for (const b of v.banding.per_kabkota) {

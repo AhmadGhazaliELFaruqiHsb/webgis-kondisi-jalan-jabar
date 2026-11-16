@@ -11,14 +11,35 @@ function gambarValidasi(v) {
   const r = v.ringkasan;
   const kelompok = [...new Set(v.pemeriksaan.map((p) => p.kelompok))];
   const chip = (s) => `<span class="chip" style="background:${WARNA_STATUS[s][0]};color:${WARNA_STATUS[s][1]}">${LABEL_STATUS[s]}</span>`;
+  const k = r.kebenaran || r, b = r.pembanding || { lulus: 0, total: 0 };
+  const jenisKelompok = (g) => v.pemeriksaan.find((p) => p.kelompok === g)?.jenis || "kebenaran";
+  const judulBagian = { kebenaran: false, pembanding: false };
   $("isiValidasi").innerHTML = `
-    <div class="ringkas-validasi">
-      <div><strong>${r.lulus}</strong><span>lulus</span></div>
-      <div><strong>${r.perhatian}</strong><span>perlu perhatian</span></div>
-      <div><strong>${r.gagal}</strong><span>tidak sesuai</span></div>
-      <p>dari ${r.total} pemeriksaan otomatis pada data di PostGIS.</p>
+    <div class="ringkas-dua">
+      <section class="kartu ringkas-jenis">
+        <h2>Uji kebenaran data</h2>
+        <p class="bantu">Apakah data di aplikasi benar, lengkap, dan konsisten, termasuk dicek silang dengan olahan resmi DBMPR dari survei yang sama.</p>
+        <div class="ringkas-validasi">
+          <div><strong>${k.lulus}</strong><span>lulus</span></div>
+          <div><strong>${k.perhatian}</strong><span>perlu perhatian</span></div>
+          <div><strong>${k.gagal}</strong><span>tidak sesuai</span></div>
+          <p>dari ${k.total} pemeriksaan.</p>
+        </div>
+      </section>
+      ${b.total ? `<section class="kartu ringkas-jenis">
+        <h2>Perbandingan dengan Galura</h2>
+        <p class="bantu">Kecocokan dengan rekap tahunan DBMPR yang memakai metode survei berbeda. Selisih di sini menunjukkan perbedaan metode, bukan kesalahan data.</p>
+        <div class="ringkas-validasi">
+          <div><strong>${b.lulus} <small>/ ${b.total}</small></strong><span>sesuai</span></div>
+          <p>Penjelasan selisih ada di bagian bawah halaman.</p>
+        </div>
+      </section>` : ""}
     </div>
-    ${kelompok.map((g) => `
+    ${kelompok.map((g) => {
+      const j = jenisKelompok(g);
+      const pembuka = judulBagian[j] ? "" : `<h2 class="judul-jenis">${j === "kebenaran" ? "Uji kebenaran data" : "Perbandingan dengan sumber lain"}</h2>`;
+      judulBagian[j] = true;
+      return `${pembuka}
       <h3>${esc(g)}</h3>
       <ul class="daftar-cek">
         ${v.pemeriksaan.filter((p) => p.kelompok === g).map((p) => `
@@ -27,7 +48,8 @@ function gambarValidasi(v) {
             <div class="hasil-cek">${esc(p.hasil)}</div>
             ${p.keterangan ? `<div class="ket-cek">${esc(p.keterangan)}</div>` : ""}
           </li>`).join("")}
-      </ul>`).join("")}
+      </ul>`;
+    }).join("")}
     <h3>Roadroid dibandingkan Galura ${v.banding.tahun}, per Kabupaten/Kota</h3>
     <p class="bantu">Setiap titik adalah satu Kabupaten/Kota (persen jalan mantap). Jika kedua sumber sejalan, titik-titik akan berada di sekitar garis putus-putus. Korelasi r = ${fmt(v.banding.korelasi, 2)}.</p>
     <div class="kotak-grafik tinggi"><canvas id="cValidasi" role="img" aria-label="Grafik sebar persen jalan mantap Roadroid terhadap Galura per Kabupaten/Kota"></canvas></div>

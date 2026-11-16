@@ -117,12 +117,10 @@ async function muatParah() {
 async function muatValidasi() {
   try {
     const v = await api("/api/validasi");
-    const r = v.ringkasan;
+    const k = v.ringkasan.kebenaran || v.ringkasan, b = v.ringkasan.pembanding;
     $("dValidasi").innerHTML = `
-      <div><strong>${r.lulus}</strong><span>lulus</span></div>
-      <div><strong>${r.perhatian}</strong><span>perlu perhatian</span></div>
-      <div><strong>${r.gagal}</strong><span>tidak sesuai</span></div>
-      <span class="bantu" style="margin:0">dari ${r.total} pemeriksaan</span>
+      <div><strong>${k.lulus}<small> / ${k.total}</small></strong><span>uji kebenaran data lulus${k.perhatian ? `, ${k.perhatian} perlu perhatian` : ""}${k.gagal ? `, ${k.gagal} tidak sesuai` : ""}</span></div>
+      ${b ? `<div><strong>${b.lulus}<small> / ${b.total}</small></strong><span>sesuai dengan Galura (metode survei berbeda)</span></div>` : ""}
       <a class="tombol" href="validasi.html">Lihat rincian validasi →</a>`;
   } catch (e) { $("dValidasi").textContent = e.message; }
 }

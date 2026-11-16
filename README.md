@@ -144,7 +144,10 @@ Kesalahan dikembalikan sebagai `{ "galat": "pesan" }` dengan kode 400 (input sal
 5. **Pemeriksaan silang dengan olahan resmi DBMPR:** survei Roadroid yang sama juga diolah DBMPR per segmen resminya (Temanjabar `6_rj_prov_skj`). Dibandingkan per ruas: kecocokan kode ruas, korelasi IRI, kesamaan kelas, dan persen mantap
 6. **Perbandingan dengan Galura 2021:** total panjang, persen mantap provinsi, dan korelasi antar Kabupaten/Kota
 
-Hasil pada data saat ini: 20 lulus, 1 perlu perhatian, 2 tidak sesuai.
+Hasil pada data saat ini dibagi dua jenis:
+
+- **Uji kebenaran data (kelompok 1–5):** 19 lulus, 1 perlu perhatian, 0 tidak sesuai, dari 20 pemeriksaan.
+- **Perbandingan dengan Galura (kelompok 6, metode survei berbeda):** 1 dari 3 sesuai. Selisih di sini menunjukkan perbedaan metode survei, bukan kesalahan data.
 
 - **Pemeriksaan silang DBMPR (semua lulus):** IRI rata-rata per ruas hasil olahan aplikasi berkorelasi r = 0,957 dengan olahan DBMPR (selisih median 0,06 m/km), 275 dari 297 ruas (92,6%) berkelas sama, dan persen mantap 49,2% vs 50,6%. Artinya, pengolahan data di aplikasi ini sudah benar.
 
