@@ -469,3 +469,130 @@ input::placeholder { color: var(--placeholder); }
 .dialog .daftar-cek li, .dialog .daftar-cek { max-width: none; }
 
 .dialog .kelas-gambar { padding-left: 0; }
+
+/* ======================================================================
+   Tata letak peta ala Google Maps
+   Peta penuh, kotak cari dan tombol pil melayang di atasnya, panel melayang
+   yang bisa dilipat, zoom dan "lokasi saya" di kanan bawah, lapisan di kiri bawah.
+   ====================================================================== */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dasar-redup { filter: saturate(.12) brightness(1.05); }   /* peta dasar "Jalan": warna diredam agar data menonjol */
+
+.atas-peta {
+  position: absolute; z-index: 1000; top: 12px; left: 12px; right: 12px;
+  display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; pointer-events: none;
+}
+.atas-peta > * { pointer-events: auto; }
+.kotak-cari {
+  position: relative; display: flex; align-items: center; width: 380px; max-width: 100%; height: 48px; padding: 0 14px 0 4px;
+  background: var(--tinta); border: 1px solid var(--garis); border-radius: 24px; box-shadow: 0 2px 10px var(--bayangan);
+}
+.kotak-cari input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; padding: 0 8px; font-size: 15px; outline: none; }
+.kotak-cari input::placeholder { color: var(--placeholder); }
+.kotak-cari:focus-within { border-color: var(--redup); }
+.kotak-cari .ikon-cari { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--redup); stroke-width: 2; stroke-linecap: round; }
+.kotak-cari .saran { top: calc(100% + 6px); margin: 0; }
+.tombol-ikon {
+  width: 40px; height: 40px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%;
+  background: transparent; cursor: pointer;
+}
+.tombol-ikon:hover { background: var(--tinta-3); }
+.tombol-ikon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+.chip-peta { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 8px; }
+.chip-k {
+  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px; border-radius: 16px; cursor: pointer;
+  background: var(--tinta); border: 1px solid var(--garis); box-shadow: 0 1px 6px var(--bayangan); font-size: 14px; font-weight: 500; white-space: nowrap;
+}
+.chip-k:hover { background: var(--tinta-2); }
+.chip-k i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.chip-k[aria-pressed="false"] { color: var(--redup); text-decoration: line-through; }
+.chip-k[aria-pressed="false"] i { opacity: .3; }
+.chip-k svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* tombol peta bulat-kotak (lokasi saya) dan kontrol zoom bergaya kartu */
+.tombol-peta {
+  width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; color: var(--teks);
+  background: var(--tinta); border: 1px solid var(--garis); border-radius: 8px; box-shadow: 0 2px 8px var(--bayangan);
+}
+.tombol-peta:hover { background: var(--tinta-2); }
+.tombol-peta svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.leaflet-bottom.leaflet-right .leaflet-control-zoom { border-radius: 8px !important; overflow: hidden; box-shadow: 0 2px 8px var(--bayangan) !important; }
+.leaflet-bottom.leaflet-right .leaflet-control-zoom a { width: 40px !important; height: 38px !important; line-height: 38px !important; font-size: 20px !important; }
+
+/* panel "Lapisan peta" di kiri bawah: tombol bergambar pratinjau, panel kartu dengan ubin bergambar */
+.kontrol-lapisan { position: relative; }
+.tombol-lapisan {
+  position: relative; display: block; width: 72px; height: 72px; padding: 0; cursor: pointer; overflow: hidden;
+  border: 2px solid #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.35); background: var(--tinta-3);
+}
+.tombol-lapisan img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tombol-lapisan span {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 4px 4px; font-size: 12px; font-weight: 600; color: #fff;
+  background: linear-gradient(transparent, rgba(0,0,0,.65));
+}
+.panel-lapisan {
+  position: absolute; left: 0; bottom: 0; width: 272px; max-height: min(560px, calc(100vh - 160px)); overflow-y: auto; padding: 12px 14px 14px;
+  background: var(--tinta); color: var(--teks); border: 1px solid var(--garis); border-radius: 12px; box-shadow: 0 6px 24px var(--bayangan);
+}
+.pl-kepala { display: flex; align-items: center; justify-content: space-between; }
+.pl-kepala strong { font: 600 18px/1.2 var(--f-judul); }
+.pl-tutup { width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: var(--redup); }
+.pl-tutup:hover { background: var(--tinta-3); color: var(--teks); }
+.pl-judul { margin: 12px 0 8px; font-size: 13px; font-weight: 600; color: var(--redup); border-top: 1px solid var(--garis); padding-top: 12px; }
+.pl-kepala + .pl-judul { border-top: 0; padding-top: 0; margin-top: 6px; }
+.pl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 6px; }
+.pl-ubin {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: none; cursor: pointer;
+  font-size: 12px; line-height: 1.2; text-align: center; color: var(--teks);
+}
+.pl-ubin img, .pl-ubin svg {
+  width: 64px; height: 48px; border-radius: 8px; object-fit: cover; display: block; border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--garis);
+}
+.pl-ubin:hover img, .pl-ubin:hover svg { box-shadow: 0 0 0 1px var(--redup); }
+.pl-ubin[aria-pressed="true"] { color: var(--pilih); font-weight: 600; }
+:root[data-tema="terang"] .pl-ubin[aria-pressed="true"] { color: #2D3BFF; }
+.pl-ubin[aria-pressed="true"] img, .pl-ubin[aria-pressed="true"] svg { border-color: var(--pilih); box-shadow: none; }
+:root[data-tema="terang"] .pl-ubin[aria-pressed="true"] img, :root[data-tema="terang"] .pl-ubin[aria-pressed="true"] svg { border-color: #2D3BFF; }
+.pilihan-dasar { grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); }
+
+/* popup: tombol detail selebar penuh, tombol tautan berdampingan di bawahnya */
+.pop-aksi { flex-wrap: wrap; }
+.pop-aksi button.tombol { flex-basis: 100%; }
+
+/* desktop: peta penuh, panel melayang di kiri */
+@media (min-width: 861px) {
+  .ruang { position: relative; }
+  .peta-bungkus { position: absolute; inset: 0; }
+  .sisi {
+    position: absolute; z-index: 1100; top: 72px; left: 12px; bottom: 12px; width: 380px;
+    border: 1px solid var(--garis); border-radius: 12px; box-shadow: 0 6px 24px var(--bayangan); overflow: hidden;
+    transition: transform .2s ease, opacity .2s ease;
+  }
+  body.sisi-tutup .sisi { transform: translateX(calc(-100% - 24px)); opacity: 0; pointer-events: none; }
+  .atas-peta { right: 230px; }   /* sisakan ruang untuk legenda di kanan atas */
+  .chip-peta { padding-top: 8px; }
+  /* kontrol kiri bawah bergeser ke kanan panel agar tidak tertutup */
+  body:not(.sisi-tutup) .leaflet-bottom.leaflet-left { left: 404px; }
+  .leaflet-bottom.leaflet-left { transition: left .2s ease; }
+}
+
+/* ponsel/tablet: kotak cari di atas peta, panel tetap di bawah */
+@media (max-width: 860px) {
+  .atas-peta { top: 8px; left: 8px; right: 8px; gap: 6px; }
+  .kotak-cari { width: 100%; height: 44px; }
+  .chip-peta { flex-wrap: nowrap; overflow-x: auto; padding: 2px 2px 4px; width: 100%; scrollbar-width: none; }
+  .chip-peta::-webkit-scrollbar { display: none; }
+  .chip-k { height: 30px; padding: 0 11px; font-size: 13px; }
+  .leaflet-top { top: 92px; }
+  .tombol-lapisan { width: 58px; height: 58px; }
+  .panel-lapisan { width: min(272px, calc(100vw - 40px)); }
+  #btnLipat { display: none; }
+  .kotak-cari { padding-left: 14px; }
+}
+
+/* jalan non-provinsi (rujukan abu-abu) */
+.ket-lap { display: block; margin-left: 26px; color: var(--redup); font-size: 12px; }
+.legenda .leg-lain { display: flex; align-items: center; gap: 9px; margin-top: 4px; font-size: 13px; color: var(--teks); }
+.legenda .leg-lain i { width: 24px; height: 4px; border-radius: 3px; background: #7B8794; flex: none; }

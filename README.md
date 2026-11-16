@@ -83,6 +83,8 @@ Leaflet, Chart.js, dan font sudah ada di `public/vendor/`, jadi tidak perlu CDN.
 | `data/pembanding_skj_dbmpr.csv` | IRI per segmen resmi DBMPR (survei Roadroid Jan 2021, 2.633 segmen), untuk validasi | Temanjabar, layer `6_rj_prov_skj` |
 | `data/pembanding_visual_dbmpr.csv` | Luas permukaan per kelas kerusakan, survei visual 29 ruas Sukabumi, untuk validasi | Temanjabar, layer `1_rj_prov_kemantapan` |
 | `data/ambil_pembanding.py` | Script pengunduh dua berkas pembanding di atas (WFS Temanjabar) | — |
+| `public/data/jalan_nasional.geojson`, `jalan_tol.geojson`, `jalan_kabkota.geojson` | Jalan non-provinsi, ditampilkan abu-abu sebagai rujukan (tanpa data kondisi) | Temanjabar, layer `2_rj_nasional`, `3_rj_tol_operasional`, `5_rj_kab_kota` |
+| `data/ambil_jalan_lain.py` | Script pengunduh dan penyederhana tiga berkas jalan non-provinsi di atas | — |
 
 Klasifikasi kondisi dari IRI (m/km): Baik < 4, Sedang 4–8, Rusak Ringan 8–12, Rusak Berat ≥ 12. Jalan **mantap** = Baik + Sedang.
 

@@ -1,21 +1,40 @@
 "use strict";
 // Konfigurasi bersama: kelas kondisi, peta dasar, dan fungsi pembantu.
 
+// gambar: foto nyata contoh kondisi dari Wikimedia Commons (berlisensi bebas, wajib mencantumkan pemilik dan lisensi).
+// Foto adalah contoh visual tiap kelas, bukan foto ruas jalan provinsi dengan IRI terukur.
+const LISENSI = {
+  "CC BY-SA 4.0": "https://creativecommons.org/licenses/by-sa/4.0/deed.id",
+  "CC BY 4.0": "https://creativecommons.org/licenses/by/4.0/deed.id",
+};
 const KONDISI = [
   { nama: "Baik", warna: "#2E9E4F", teks: "#1E2329", rentang: "IRI < 4",
-    gambar: "img/kondisi/baik.svg",
+    gambar: "img/kondisi/foto-baik.jpg",
+    foto: { lokasi: "Muaro Jambi, Jambi", oleh: "Firzafp", lisensi: "CC BY-SA 4.0",
+            url: "https://commons.wikimedia.org/wiki/File:Muaro_Jambi_Temple_Complex_access_road_-_Muaro_Jambi,_JA_(10_Mar_2023)_01.jpg" },
     ciri: "Permukaan rata dan menerus. Kendaraan melaju nyaman tanpa guncangan berarti." },
   { nama: "Sedang", warna: "#F2B705", teks: "#1E2329", rentang: "IRI 4 - 8",
-    gambar: "img/kondisi/sedang.svg",
+    gambar: "img/kondisi/foto-sedang.jpg",
+    foto: { lokasi: "Kebumen, Jawa Tengah", oleh: "DARMAS BS 9", lisensi: "CC BY-SA 4.0",
+            url: "https://commons.wikimedia.org/wiki/File:Perbaikan_Jalan_Aspal_Yg_Rusak_Di_Jl.Kaswari_Kebumen_Oleh_PUPR_Kab.Kebumen.jpg" },
     ciri: "Mulai bergelombang, ada retak halus dan tambalan. Masih nyaman dilalui." },
   { nama: "Rusak Ringan", warna: "#F08A24", teks: "#1E2329", rentang: "IRI 8 - 12",
-    gambar: "img/kondisi/rusak-ringan.svg",
+    gambar: "img/kondisi/foto-rusak-ringan.jpg",
+    foto: { lokasi: "Surabaya, Jawa Timur", oleh: "MR Bang Jago", lisensi: "CC BY 4.0",
+            url: "https://commons.wikimedia.org/wiki/File:Foto_Jalan_Rusak_di_Suatu_Daerah_Kota_Surabaya.jpg" },
     ciri: "Retak berkelompok, lubang kecil, dan gelombang terasa. Kecepatan perlu dikurangi." },
   { nama: "Rusak Berat", warna: "#D63A2F", teks: "#FFFFFF", rentang: "IRI ≥ 12",
-    gambar: "img/kondisi/rusak-berat.svg",
+    gambar: "img/kondisi/foto-rusak-berat.jpg",
+    foto: { lokasi: "Indonesia", oleh: "YT Arty", lisensi: "CC BY-SA 4.0",
+            url: "https://commons.wikimedia.org/wiki/File:Jalan_rusak_berlubang_-_IMG20260420173247.jpg" },
     ciri: "Lubang besar dan aspal terkelupas. Guncangan kuat, berbahaya bagi pengendara." },
 ];
 const INFO = Object.fromEntries(KONDISI.map((k) => [k.nama, k]));
+
+// Baris kredit foto (HTML) untuk ditampilkan di bawah foto kelas kondisi
+const kreditFoto = (k) =>
+  `Foto: <a href="${k.foto.url}" target="_blank" rel="noopener">${esc(k.foto.oleh)}</a>, ${esc(k.foto.lokasi)} · ` +
+  `<a href="${LISENSI[k.foto.lisensi]}" target="_blank" rel="noopener">${k.foto.lisensi}</a> · Wikimedia Commons`;
 
 // Peta dasar tanpa API key. (Ubin CARTO sekarang mewajibkan key, jadi tidak dipakai.)
 // "label" = lapisan tulisan (nama tempat) yang ditumpuk di atas peta dasar.
@@ -33,6 +52,13 @@ const PETA_DASAR = {
     label: `${ESRI}/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
     opsi: { maxZoom: 18, maxNativeZoom: 16, attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ" },
   },
+  // gaya peta jalan seperti Google Maps (jalan, nama tempat, area hijau); warnanya diredupkan lewat CSS (.dasar-redup)
+  // supaya garis jalan oranye peta dasar tidak tertukar dengan warna kondisi jalan
+  jalan: {
+    nama: "Jalan", pilih: "#2D3BFF", teksPilih: "#FFFFFF",
+    url: `${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`,
+    opsi: { maxZoom: 19, maxNativeZoom: 19, className: "dasar-redup", attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap" },
+  },
   osm: {
     nama: "OSM", pilih: "#2D3BFF", teksPilih: "#FFFFFF",
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -44,6 +70,20 @@ const PETA_DASAR = {
     opsi: { maxZoom: 18, attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics" },
   },
 };
+
+// Peta dasar awal mengikuti tema: tema terang memakai peta jalan bergaya Google Maps, tema gelap memakai peta gelap
+const dasarAwal = () => (document.documentElement.dataset.tema === "terang" ? "jalan" : "gelap");
+// Peta dasar yang tampil saat halaman Peta dibuka (pilihan menu: "standar", "osm", atau "satelit")
+const JENIS_BAWAAN = "osm";
+// Pilihan jenis peta yang ditampilkan ke pengguna. "standar" = peta bawaan tema (jalan atau gelap).
+const JENIS_PETA = ["standar", "osm", "satelit"];
+const namaJenisPeta = (k) => (k === "standar" ? "Standar" : PETA_DASAR[k].nama);
+// kunci peta dasar sebenarnya -> pilihan yang tampil di menu
+const jenisDariDasar = (kunci) => (["jalan", "gelap", "terang"].includes(kunci) ? "standar" : kunci);
+
+// Tautan untuk membuka satu titik di Google Maps (tab baru)
+const urlGoogleMaps = (lat, lng) =>
+  `https://www.google.com/maps/search/?api=1&query=${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
 
 // Warna seleksi (lingkaran radius, titik, sorotan hasil) dipilih berlawanan dengan palet data yang hangat
 // (hijau, kuning, oranye, merah): biru-sian. Cyan terang di peta gelap/satelit, biru tua di peta terang/OSM.

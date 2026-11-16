@@ -5,6 +5,7 @@ Chart.defaults.font.family = '"Barlow", system-ui, sans-serif';
 Chart.defaults.font.size = 12;
 
 const S = {
+  dasar: JENIS_BAWAAN, // peta dasar terpilih: standar (ikut tema) | osm | satelit
   kondisi: new Set(KONDISI.map((k) => k.nama)),
   kab: "",
   tab: "peta",
@@ -64,6 +65,16 @@ function bangunKondisi() {
        <img class="mini-foto" src="${k.gambar}" alt="" width="64" height="40" loading="lazy">
        <span class="nilai"><span data-km>–</span><small data-pct>–</small></span>
      </label>`).join("");
+  // tombol "pil" di atas peta: alih kondisi + lokasi saya
+  $("chipKondisi").innerHTML = KONDISI.map((k) =>
+    `<button type="button" class="chip-k" data-k="${k.nama}" aria-pressed="true"><i style="background:${k.warna}"></i>${k.nama}</button>`).join("") +
+    `<button type="button" class="chip-k" data-aksi="lokasi"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Sekitar saya</button>`;
+  $("chipKondisi").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.aksi === "lokasi") lokasiSaya();
+    else alihKondisi(b.dataset.k);
+  });
   $("komposisi").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-k]");
     if (b) alihKondisi(b.dataset.k);
@@ -83,6 +94,7 @@ function alihKondisi(nama, nyala) {
 function sinkronKondisi() {
   for (const b of $("komposisi").children) b.setAttribute("aria-pressed", S.kondisi.has(b.dataset.k));
   for (const c of $("filterKondisi").querySelectorAll("input")) c.checked = S.kondisi.has(c.dataset.k);
+  for (const b of $("chipKondisi").querySelectorAll("[data-k]")) b.setAttribute("aria-pressed", S.kondisi.has(b.dataset.k));
 }
 
 function gambarRingkasan(r) {
@@ -136,6 +148,7 @@ function aktifkanTab(nama) {
 function bukaSheet(buka) {
   document.body.classList.toggle("sisi-tutup", !buka);
   $("btnPanel").setAttribute("aria-expanded", String(buka));
+  $("btnLipat").setAttribute("aria-expanded", String(buka));
   Peta.ukuran();
   setTimeout(() => Peta.ukuran(), 100);
 }
@@ -579,11 +592,18 @@ function pasangTerdekat() {
   });
 }
 
+// ---------------------------------------------------------------- peta dasar
+function gantiDasar(k) {
+  S.dasar = k;
+  Peta.ubahDasar(k === "standar" ? dasarAwal() : k);
+  for (const x of $("pilihDasar").children) x.setAttribute("aria-pressed", String(x.dataset.k === k));
+}
+
 // ---------------------------------------------------------------- tema (tombolnya diatur situs.js)
 // Bagian khusus peta: peta dasar Gelap/Terang ikut tema, gaya garis dan sorotan grafik profil diperbarui
 document.addEventListener("temaberubah", (e) => {
-  const aktif = $("pilihDasar").querySelector('[aria-pressed="true"]');
-  if (aktif && (aktif.dataset.k === "gelap" || aktif.dataset.k === "terang")) $("pilihDasar").querySelector(`[data-k="${e.detail}"]`).click();
+  // peta "Standar" ikut tema (jalan di tema terang, gelap di tema gelap); pilihan OSM atau satelit dibiarkan
+  if (S.dasar === "standar") Peta.ubahDasar(dasarAwal());
   Peta.segarkanGaya();
   if (S.ruas && grafik.profil) {
     const ds = grafik.profil.data.datasets[0];
@@ -613,6 +633,10 @@ function pasangUI() {
   // lapisan
   $("lapSegmen").addEventListener("change", (e) => Peta.atur("segmen", e.target.checked));
   $("lapBatas").addEventListener("change", (e) => Peta.atur("batas", e.target.checked));
+  // jalan non-provinsi sebagai rujukan (abu-abu); berkasnya dimuat saat pertama dinyalakan
+  for (const [id, jenis] of [["lapNasional", "nasional"], ["lapKabkota", "kabkota"]]) {
+    $(id).addEventListener("change", (e) => Promise.resolve(Peta.atur(jenis, e.target.checked)).catch((err) => pesan(err.message, 6000)));
+  }
   $("lapRuas").addEventListener("change", (e) => {
     S.lapisanRuas = e.target.checked;
     Peta.atur("ruas", e.target.checked);
@@ -620,13 +644,12 @@ function pasangUI() {
   });
 
   // peta dasar
-  $("pilihDasar").innerHTML = Object.entries(PETA_DASAR).map(([k, d]) =>
-    `<button type="button" data-k="${k}" aria-pressed="${k === (temaTerang() ? "terang" : "gelap")}">${d.nama}</button>`).join("");
+  // peta dasar: Standar (ikut tema), OSM, Satelit. Pilihan Gelap/Terang tidak ditampilkan karena sudah diatur tema.
+  $("pilihDasar").innerHTML = JENIS_PETA.map((k) =>
+    `<button type="button" data-k="${k}" aria-pressed="${k === S.dasar}">${namaJenisPeta(k)}</button>`).join("");
   $("pilihDasar").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-k]");
-    if (!b) return;
-    Peta.ubahDasar(b.dataset.k);
-    for (const x of $("pilihDasar").children) x.setAttribute("aria-pressed", x === b);
+    if (b) gantiDasar(b.dataset.k);
   });
 
   // analisis
@@ -648,6 +671,7 @@ function pasangUI() {
 
   // kepala
   $("btnPanel").addEventListener("click", () => bukaSheet(document.body.classList.contains("sisi-tutup")));
+  $("btnLipat").addEventListener("click", () => bukaSheet(document.body.classList.contains("sisi-tutup")));
   window.addEventListener("resize", () => Peta.ukuran());
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && S.modeTitik) { selesaiPilihTitik(); infoTerdekat(""); }
@@ -659,7 +683,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     Peta.init({
       pilihRuas: (id) => pilihRuas(id),
-      detail: (id) => { pilihRuas(id, { buka: true }); if (mobile()) bukaSheet(true); },
+      detail: (id) => { pilihRuas(id, { buka: true }); if (document.body.classList.contains("sisi-tutup")) bukaSheet(true); },
+      lokasi: () => lokasiSaya(),
+      pilihDasar: (k) => gantiDasar(k),
     });
     pasangUI();
     const meta = await api("/api/meta");
@@ -670,6 +696,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("selTahun").innerHTML = tahun.map((t) => `<option value="${t}">${t}</option>`).join("");
 
     S.batasJabar = await Peta.muatBatas();
+    Promise.resolve(Peta.atur("nasional", $("lapNasional").checked)).catch((err) => pesan(err.message, 6000));
     Peta.zoomBatas(S.batasJabar);
     await Promise.all([muatRingkasan(), muatPeta()]);
     panaskanLokasi();

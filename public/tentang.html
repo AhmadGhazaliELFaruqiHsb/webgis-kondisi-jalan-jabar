@@ -47,20 +47,15 @@
     <h2>Kelas kondisi</h2>
     <ul id="kelasGambar" class="kelas-gambar"></ul>
     <p>Jalan disebut <strong>mantap</strong> bila berkondisi baik atau sedang, dan <strong>tidak mantap</strong> bila rusak ringan atau rusak berat.</p>
-    <p class="sumber">Gambar adalah ilustrasi umum tiap kelas, bukan foto ruas tertentu. IRI mengukur ketidakrataan permukaan, sedangkan retak
-      dan lubang hanyalah contoh kerusakan yang biasa menyertainya. Foto nyata di lokasi tersedia lewat Street View pada halaman Peta.</p>
+    <p class="sumber">Foto adalah contoh nyata kondisi jalan di Indonesia untuk tiap kelas (Wikimedia Commons, berlisensi bebas), bukan foto
+      ruas jalan provinsi yang diukur. IRI mengukur ketidakrataan permukaan, sedangkan retak dan lubang hanyalah contoh kerusakan yang biasa
+      menyertainya. Foto lokasi ruas yang sebenarnya tersedia lewat Street View pada halaman Peta.</p>
 
     <h2>Sumber data</h2>
     <div class="tabel-bungkus">
-      <table class="tabel tabel-info">
-        <tbody>
-          <tr><td>Ruas jalan provinsi (297 ruas)</td><td>Temanjabar, GeoServer DBMPR, layer 1_rj_prov_kemantapan</td></tr>
-          <tr><td>Nilai IRI per titik survei</td><td>Survei Roadroid, Temanjabar, Januari 2021, layer 7_rj_roadroid_skj</td></tr>
-          <tr><td>Batas provinsi</td><td>Temanjabar, layer daerah_jawa_barat</td></tr>
-          <tr><td>Panjang jalan per kondisi, 2018 sampai 2025</td><td>Galura Data Jabar (DBMPR)</td></tr>
-          <tr><td>Pembanding validasi: IRI per segmen resmi DBMPR</td><td>Temanjabar, layer 6_rj_prov_skj</td></tr>
-          <tr><td>Pembanding validasi: survei visual 29 ruas Sukabumi</td><td>Temanjabar, layer 1_rj_prov_kemantapan</td></tr>
-        </tbody>
+      <table class="tabel tabel-info tabel-sumber">
+        <thead><tr><th scope="col">Data</th><th scope="col">Sumber</th><th scope="col">Tautan</th></tr></thead>
+        <tbody id="tabelSumber"></tbody>
       </table>
     </div>
 
@@ -113,10 +108,28 @@
   <script src="js/situs.js"></script>
   <script>
     "use strict";
+    // tabel sumber data; tautan layer membuka contoh 50 fitur dalam format GeoJSON dari layanan WFS Temanjabar
+    const WFS = (layer) => "https://geo.temanjabar.net/geoserver/wfs?service=WFS&version=1.0.0&request=GetFeature" +
+      `&typeName=temanjabar:${layer}&maxFeatures=50&outputFormat=application/json`;
+    const a = (url, teks) => `<a class="tautan" href="${url}" target="_blank" rel="noopener">${teks} ↗</a>`;
+    const SUMBER = [
+      ["Ruas jalan provinsi (297 ruas)", "Temanjabar (GeoServer DBMPR), layer 1_rj_prov_kemantapan", a(WFS("1_rj_prov_kemantapan"), "Data layer")],
+      ["Nilai IRI per titik survei", "Survei Roadroid Januari 2021, Temanjabar, layer 7_rj_roadroid_skj", a(WFS("7_rj_roadroid_skj"), "Data layer")],
+      ["Batas provinsi", "Temanjabar, layer daerah_jawa_barat", a(WFS("daerah_jawa_barat"), "Data layer")],
+      ["Panjang jalan per kondisi, 2018 sampai 2025", "Galura / Open Data Jabar (DBMPR)", a("https://opendata.jabarprov.go.id/id/dataset?q=kondisi+jalan", "Open Data Jabar")],
+      ["Pembanding validasi: IRI per segmen resmi DBMPR", "Temanjabar, layer 6_rj_prov_skj", a(WFS("6_rj_prov_skj"), "Data layer")],
+      ["Pembanding validasi: survei visual 29 ruas Sukabumi", "Temanjabar, layer 1_rj_prov_kemantapan", a(WFS("1_rj_prov_kemantapan"), "Data layer")],
+      ["Foto contoh kelas kondisi", "Wikimedia Commons (CC BY / CC BY-SA)", KONDISI.map((k) => a(k.foto.url, k.nama)).join("<br>")],
+      ["Portal dan layanan peta", "Temanjabar dan GeoServer DBMPR Jawa Barat",
+        a("https://temanjabar.net", "Temanjabar") + "<br>" + a("https://geo.temanjabar.net/geoserver/ows?service=WFS&version=1.0.0&request=GetCapabilities", "Daftar layer WFS")],
+    ];
+    document.getElementById("tabelSumber").innerHTML = SUMBER.map(([d, s, t]) => `<tr><td>${d}</td><td>${s}</td><td>${t}</td></tr>`).join("");
+
     document.getElementById("kelasGambar").innerHTML = KONDISI.map((c) => `
       <li>
-        <img src="${c.gambar}" alt="Ilustrasi jalan kondisi ${c.nama.toLowerCase()}" width="160" height="90" loading="lazy">
-        <div><strong><i class="titik" style="background:${c.warna}"></i> ${c.nama}</strong> <span>${c.rentang}</span><p>${c.ciri}</p></div>
+        <img src="${c.gambar}" alt="Contoh jalan kondisi ${c.nama.toLowerCase()}" width="160" height="90" loading="lazy">
+        <div><strong><i class="titik" style="background:${c.warna}"></i> ${c.nama}</strong> <span>${c.rentang}</span><p>${c.ciri}</p>
+          <p class="kredit-foto">${kreditFoto(c)}</p></div>
       </li>`).join("");
   </script>
 </body>

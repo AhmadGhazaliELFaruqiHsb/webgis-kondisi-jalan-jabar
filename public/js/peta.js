@@ -16,7 +16,10 @@ const Peta = (() => {
   let rSegmen = null;
   let aksiKlikTitik = null;
   let kembali = { pilihRuas() {}, detail() {} };
-  const visibel = { segmen: true, ruas: false, batas: true };
+  const visibel = { segmen: true, ruas: false, batas: true, nasional: true, kabkota: false };
+  // jalan non-provinsi (abu-abu, tanpa data kondisi): dimuat dari berkas statis public/data saat pertama dinyalakan
+  const grupLain = { nasional: L.layerGroup(), kabkota: L.layerGroup() };
+  const sudahMuat = { nasional: false, kabkota: false };
 
   const tebal = (z) => (z <= 7 ? 1.8 : z <= 8 ? 2.2 : z <= 9 ? 2.8 : z <= 10 ? 3.4 : z <= 11 ? 4.2 : z <= 12 ? 5 : 6.5);
   const tebalSekarang = () => tebal(map.getZoom());
@@ -36,7 +39,8 @@ const Peta = (() => {
   function isiPopup(p, latlng, arah = 0) {
     const k = INFO[p.kondisi];
     const sv = latlng
-      ? `<a class="tombol" href="${urlStreetView(latlng.lat, latlng.lng)}" target="_blank" rel="noopener noreferrer" title="Buka Street View di tab baru">Layar penuh</a>`
+      ? `<a class="tombol" href="${urlStreetView(latlng.lat, latlng.lng)}" target="_blank" rel="noopener noreferrer" title="Buka Street View di tab baru">Layar penuh</a>
+         <a class="tombol" href="${urlGoogleMaps(latlng.lat, latlng.lng)}" target="_blank" rel="noopener noreferrer" title="Buka lokasi ini di Google Maps (tab baru)">Google Maps ↗</a>`
       : "";
     const foto = latlng
       ? `<div class="pop-sv"><iframe src="${urlStreetViewSemat(latlng.lat, latlng.lng, arah)}" title="Google Street View ${esc(p.nm_ruas)}"
@@ -68,28 +72,105 @@ const Peta = (() => {
   function init(opsi) {
     kembali = opsi;
     map = L.map("peta", { zoomControl: false, preferCanvas: true, minZoom: 6, maxZoom: 18, center: [-6.9, 107.6], zoom: 8 });
-    L.control.zoom({ position: "topright" }).addTo(map);
+    // tata letak ala Google Maps: zoom dan "lokasi saya" di kanan bawah, pilihan lapisan di kiri bawah
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    const ctrlLokasi = L.control({ position: "bottomright" });
+    ctrlLokasi.onAdd = () => {
+      const b = L.DomUtil.create("button", "tombol-peta");
+      b.type = "button"; b.title = "Lokasi saya"; b.setAttribute("aria-label", "Tampilkan jalan rusak di sekitar lokasi saya");
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>';
+      L.DomEvent.disableClickPropagation(b);
+      b.addEventListener("click", () => kembali.lokasi && kembali.lokasi());
+      return b;
+    };
+    ctrlLokasi.addTo(map);
+
+    // Panel "Lapisan peta" (pola tata letak seperti aplikasi peta umumnya; gambar pratinjau diambil dari ubin
+    // peta dasar milik aplikasi ini sendiri, ikon digambar sendiri; tidak memakai aset atau ubin Google)
+    // gelap/terang tidak ditampilkan sebagai pilihan: "Standar" otomatis memakai salah satunya sesuai tema
+    const pratinjau = (k) => PETA_DASAR[k === "standar" ? "jalan" : k].url.replace("{z}", 10).replace("{x}", 818).replace("{y}", 531); // Bandung
+    const ikonDetail = {
+      lapSegmen: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 26 L16 18 L28 20 L44 6" stroke="#2E9E4F" stroke-width="4" fill="none"/><path d="M16 18 L28 20" stroke="#F2B705" stroke-width="4"/><path d="M28 20 L36 13" stroke="#F08A24" stroke-width="4"/><path d="M36 13 L44 6" stroke="#D63A2F" stroke-width="4"/></svg>',
+      lapRuas: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 8 C14 10 18 24 28 22 S40 10 44 12" stroke="#F08A24" stroke-width="5" fill="none" stroke-linecap="round"/></svg>',
+      lapNasional: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M2 24 C14 22 20 8 46 8" stroke="#7B8794" stroke-width="4" fill="none"/><path d="M2 30 L46 18" stroke="#4A5562" stroke-width="3" stroke-dasharray="6 3" fill="none"/></svg>',
+      lapKabkota: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 6 L20 14 L18 28 M20 14 L44 10 M30 12 L34 30 M8 22 L18 20" stroke="#9AA4AF" stroke-width="1.6" fill="none"/></svg>',
+      lapBatas: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M6 6 L30 4 L42 14 L38 28 L12 26 Z" stroke="#5F6B78" stroke-width="2" stroke-dasharray="4 3" fill="none"/></svg>',
+    };
+    const NAMA_DETAIL = { lapSegmen: "Segmen kondisi", lapRuas: "Ruas rata-rata", lapNasional: "Jalan nasional & tol", lapKabkota: "Jalan kab/kota", lapBatas: "Batas provinsi" };
+    const ctrlLapisan = L.control({ position: "bottomleft" });
+    ctrlLapisan.onAdd = () => {
+      const d = L.DomUtil.create("div", "kontrol-lapisan");
+      d.innerHTML = `<button type="button" class="tombol-lapisan" aria-expanded="false" aria-controls="menuLapisan" title="Lapisan peta">
+          <img src="${pratinjau("satelit")}" alt=""><span>Lapisan</span></button>
+        <div class="panel-lapisan" id="menuLapisan" role="dialog" aria-label="Lapisan peta" hidden>
+          <div class="pl-kepala"><strong>Lapisan peta</strong>
+            <button type="button" class="pl-tutup" aria-label="Tutup">×</button></div>
+          <p class="pl-judul">Jenis peta</p>
+          <div class="pl-grid">${JENIS_PETA.map((k) => `<button type="button" class="pl-ubin" data-k="${k}" aria-pressed="false">
+              <img src="${pratinjau(k)}" alt="" loading="lazy" class="${k === "standar" ? "dasar-redup" : ""}"><span>${namaJenisPeta(k)}</span></button>`).join("")}</div>
+          <p class="pl-judul">Detail peta</p>
+          <div class="pl-grid">${Object.keys(ikonDetail).map((id) => `<button type="button" class="pl-ubin" data-lap="${id}" aria-pressed="false">
+              ${ikonDetail[id]}<span>${NAMA_DETAIL[id]}</span></button>`).join("")}</div>
+          <p class="pl-judul">Alat peta</p>
+          <div class="pl-grid">
+            <button type="button" class="pl-ubin" data-alat="titik"><svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><circle cx="24" cy="16" r="11" fill="rgba(45,59,255,.12)" stroke="#2D3BFF" stroke-width="1.5"/><circle cx="24" cy="16" r="3" fill="#2D3BFF"/></svg><span>Jalan rusak di sekitar titik</span></button>
+            <button type="button" class="pl-ubin" data-alat="lokasi"><svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><circle cx="24" cy="16" r="5" fill="#2D3BFF" stroke="#fff" stroke-width="2"/><circle cx="24" cy="16" r="10" fill="none" stroke="#2D3BFF" stroke-opacity=".35" stroke-width="3"/></svg><span>Lokasi saya</span></button>
+          </div>
+        </div>`;
+      L.DomEvent.disableClickPropagation(d);
+      L.DomEvent.disableScrollPropagation(d);
+      const tombol = d.querySelector(".tombol-lapisan"), menu = d.querySelector(".panel-lapisan");
+      const segarDetail = () => {
+        for (const b of menu.querySelectorAll("[data-lap]")) {
+          const c = document.getElementById(b.dataset.lap);
+          b.setAttribute("aria-pressed", String(!!(c && c.checked)));
+        }
+      };
+      const buka = (b) => { menu.hidden = !b; tombol.setAttribute("aria-expanded", String(b)); if (b) segarDetail(); };
+      tombol.addEventListener("click", () => buka(menu.hidden));
+      menu.querySelector(".pl-tutup").addEventListener("click", () => buka(false));
+      menu.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.k) kembali.pilihDasar && kembali.pilihDasar(b.dataset.k);
+        if (b.dataset.lap) { // menyalakan/mematikan lapisan lewat kotak centang yang sama di panel samping
+          const c = document.getElementById(b.dataset.lap);
+          if (c) { c.checked = !c.checked; c.dispatchEvent(new Event("change", { bubbles: true })); segarDetail(); }
+        }
+        if (b.dataset.alat) {
+          buka(false);
+          if (b.dataset.alat === "lokasi") kembali.lokasi && kembali.lokasi();
+          else document.getElementById("btnTitik")?.click();
+        }
+      });
+      document.addEventListener("change", (e) => { if (e.target.id in ikonDetail) segarDetail(); });
+      document.addEventListener("click", (e) => { if (!d.contains(e.target)) buka(false); });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !menu.hidden) buka(false); });
+      return d;
+    };
+    ctrlLapisan.addTo(map);
     L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
 
     // urutan tumpukan: batas < ruas < bayangan < sorotan < segmen < hasil pencarian titik
-    [["batas", 350], ["ruas", 380], ["bayang", 400], ["sorot", 405], ["segmen", 410], ["hasil", 420]].forEach(([n, z]) => {
+    [["batas", 350], ["lain", 360], ["ruas", 380], ["bayang", 400], ["sorot", 405], ["segmen", 410], ["hasil", 420]].forEach(([n, z]) => {
       map.createPane(n).style.zIndex = z;
     });
 
     rSegmen = L.canvas({ pane: "segmen", padding: 0.4, tolerance: 6 });
-    ubahDasar(temaTerang() ? "terang" : "gelap");
+    ubahDasar(JENIS_BAWAAN === "standar" ? dasarAwal() : JENIS_BAWAAN);
     grupSorot.addTo(map);
     grupHasil.addTo(map);
     grupLokasi.addTo(map);
     grupSegmen.addTo(map);
 
     // legenda
-    ctrlLegenda = L.control({ position: "bottomright" });
+    ctrlLegenda = L.control({ position: "topright" });
     ctrlLegenda.onAdd = () => {
       const d = L.DomUtil.create("div", "legenda");
       d.innerHTML = `<h4 role="button" tabindex="0" aria-expanded="true" title="Klik untuk menyembunyikan atau menampilkan">Kondisi jalan</h4><ul>${KONDISI.map((k) =>
         `<li><i style="background:${k.warna}"></i>${k.nama}<span>${k.rentang.replace("IRI ", "")}</span></li>`).join("")}</ul>
-        <p>IRI dalam m/km. Survei Roadroid, Jan 2021</p>`;
+        <p class="leg-lain"><i></i>Jalan lain (tanpa data kondisi)</p>
+        <p>Hanya jalan provinsi (297 ruas) yang dinilai. IRI dalam m/km, survei Roadroid Jan 2021</p>`;
       L.DomEvent.disableClickPropagation(d);
       const judulLegenda = d.querySelector("h4");
       const alih = (tutup) => { d.classList.toggle("tutup", tutup); judulLegenda.setAttribute("aria-expanded", String(!tutup)); };
@@ -145,7 +226,17 @@ const Peta = (() => {
     tilesAktif = L.tileLayer(d.url, d.opsi).addTo(map);
     tilesAktif.bringToBack();
     if (d.label) labelAktif = L.tileLayer(d.label, d.opsi).addTo(map); // tulisan di atas peta dasar, di bawah garis jalan
+    const menu = document.getElementById("menuLapisan");
+    if (menu) for (const b of menu.querySelectorAll("[data-k]")) b.setAttribute("aria-pressed", String(b.dataset.k === jenisDariDasar(kunci)));
   }
+
+  // Ruang peta yang tertutup panel melayang (desktop), agar zoom ke ruas tidak jatuh di belakang panel
+  function ruangPanel() {
+    const sisi = document.getElementById("sisi");
+    const melayang = window.matchMedia("(min-width: 861px)").matches && !document.body.classList.contains("sisi-tutup");
+    return melayang && sisi ? sisi.getBoundingClientRect().right - map.getContainer().getBoundingClientRect().left : 0;
+  }
+  const isi = (p) => ({ paddingTopLeft: [p + ruangPanel(), p + 56], paddingBottomRight: [p, p] });
 
   async function muatBatas() {
     const data = await api("/api/batas");
@@ -189,10 +280,37 @@ const Peta = (() => {
 
   function atur(nama, nyala) {
     visibel[nama] = nyala;
+    if (nama in grupLain) return aturLain(nama, nyala);
     const grup = { segmen: grupSegmen, ruas: grupRuas, batas: lapBatas }[nama];
     if (!grup) return;
     if (nyala) grup.addTo(map); else map.removeLayer(grup);
     if (nama === "ruas" && nyala) grupRuas.eachLayer((l) => l.bringToBack && l.bringToBack());
+  }
+
+  // Jalan nasional, tol, dan kab/kota: hanya rujukan visual. Data kondisinya bukan bagian dari survei SIKOJAB.
+  const GAYA_LAIN = {
+    nasional: { color: "#7B8794", weight: 3, opacity: 0.85 },
+    tol: { color: "#4A5562", weight: 3, opacity: 0.9, dashArray: "8 5" },
+    kabkota: { color: "#9AA4AF", weight: 1.2, opacity: 0.7 },
+  };
+  const NAMA_LAIN = { nasional: "Jalan nasional", tol: "Jalan tol", kabkota: "Jalan kabupaten/kota" };
+  async function muatLain(jenis) {
+    const rLain = L.canvas({ pane: "lain", padding: 0.4, tolerance: 4 });
+    for (const sub of jenis === "nasional" ? ["nasional", "tol"] : ["kabkota"]) {
+      const data = await fetch(`data/jalan_${sub}.geojson`).then((r) => { if (!r.ok) throw new Error(`Data ${NAMA_LAIN[sub]} belum tersedia.`); return r.json(); });
+      grupLain[jenis].addLayer(L.geoJSON(data, {
+        pane: "lain", renderer: rLain, style: () => GAYA_LAIN[sub],
+        onEachFeature: (f, l) => l.bindTooltip(`<strong>${esc(f.properties.nama || NAMA_LAIN[sub])}</strong><br>${NAMA_LAIN[sub]}, tidak termasuk data kondisi SIKOJAB`,
+          { sticky: true, className: "tip", opacity: 1 }),
+      }));
+    }
+    sudahMuat[jenis] = true;
+  }
+  async function aturLain(jenis, nyala) {
+    visibel[jenis] = nyala;
+    if (!nyala) { map.removeLayer(grupLain[jenis]); return; }
+    if (!sudahMuat[jenis]) await muatLain(jenis);
+    if (visibel[jenis]) grupLain[jenis].addTo(map);
   }
 
   const bukaPopupSegmen = (latlng, props, arah = 0) =>
@@ -204,8 +322,8 @@ const Peta = (() => {
     grupSorot.addLayer(L.geoJSON(geometri, { pane: "sorot", interactive: false, style: gayaSorot }));
   }
 
-  const zoomKe = (bbox, maxZoom = 15) => map.fitBounds([[bbox[1], bbox[0]], [bbox[3], bbox[2]]], { padding: [40, 40], maxZoom });
-  const zoomBatas = (b) => b && b.isValid() && map.fitBounds(b, { padding: [30, 30] });
+  const zoomKe = (bbox, maxZoom = 15) => map.fitBounds([[bbox[1], bbox[0]], [bbox[3], bbox[2]]], { ...isi(40), maxZoom });
+  const zoomBatas = (b) => b && b.isValid() && map.fitBounds(b, isi(20));
 
   // ---------- alat: jalan rusak di sekitar titik ----------
   function pilihTitik(aksi) { aksiKlikTitik = aksi; map.getContainer().classList.add("mode-titik"); }
@@ -254,7 +372,7 @@ const Peta = (() => {
       ref.halo.push(halo);
       hasilPerId.set(f.id, garis);
     }
-    if (fit) map.fitBounds(L.latLng(c).toBounds(data.radius_m * 2), { padding: [30, 30] });
+    if (fit) map.fitBounds(L.latLng(c).toBounds(data.radius_m * 2), isi(30));
   }
   function bersihHasil() {
     grupHasil.clearLayers(); grupLokasi.clearLayers(); hasilPerId.clear();
@@ -268,7 +386,7 @@ const Peta = (() => {
     // pop-up dibuka setelah peta selesai bergeser, agar geser-otomatisnya tidak bentrok dengan animasi zoom
     map.once("moveend", () =>
       bukaPopupSegmen(titik[Math.floor(titik.length / 2)], garis.feature.properties, arahSegmen(garis.feature.geometry))); // titik di jalan
-    map.fitBounds(g.getBounds(), { padding: [80, 80], maxZoom: 15 });
+    map.fitBounds(g.getBounds(), { ...isi(70), maxZoom: 15 });
   }
   const jarakMeter = (a, b) => map.distance([a.lat, a.lng], [b.lat, b.lng]);
 

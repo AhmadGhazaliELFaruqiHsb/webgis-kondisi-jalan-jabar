@@ -43,7 +43,7 @@
     <section class="halaman hero">
       <div>
         <span class="label-atas">WebGIS · Jalan Provinsi Jawa Barat</span>
-        <h1>Kondisi jalan provinsi Jawa Barat <span>dalam satu peta.</span></h1>
+        <h1>Kondisi jalan provinsi Jawa Barat</h1>
         <p class="lead">SIKOJAB memetakan kemulusan dan kerusakan 297 ruas jalan provinsi per segmen 1 km berdasarkan nilai IRI,
           dilengkapi dashboard, analisis tren, kueri spasial, dan validasi data.</p>
         <div class="hero-aksi">
@@ -54,6 +54,7 @@
 
       <div class="hero-kartu" aria-live="polite">
         <p class="angka-besar"><span id="bMantap">–</span><small>%</small></p>
+        <span class="label-angka">Survei Roadroid · Januari 2021</span>
         <p class="angka-ket">jalan provinsi dalam kondisi <span>mantap</span> (baik dan sedang) menurut survei Roadroid</p>
         <div class="batang-komposisi" id="bKomposisi" role="img" aria-label="Komposisi panjang jalan per kondisi"></div>
         <ul class="legenda-baris" id="bLegenda"></ul>
@@ -126,7 +127,8 @@
           </div>
         </div>
         <div class="grid-4" id="kelasKondisi"></div>
-        <p class="sumber">Gambar adalah ilustrasi umum tiap kelas, bukan foto ruas tertentu. Foto nyata tersedia lewat Street View di halaman Peta.</p>
+        <p class="sumber">Foto adalah contoh nyata kondisi jalan di Indonesia untuk tiap kelas, bukan foto ruas jalan provinsi yang diukur.
+          Foto lokasi ruas yang sebenarnya tersedia lewat Street View di halaman Peta.</p>
       </div>
     </section>
 
@@ -182,10 +184,11 @@
     // kartu kelas kondisi
     document.getElementById("kelasKondisi").innerHTML = KONDISI.map((k) => `
       <div class="kartu kartu-kelas">
-        <img src="${k.gambar}" alt="Ilustrasi jalan kondisi ${k.nama.toLowerCase()}" loading="lazy">
+        <img src="${k.gambar}" alt="Contoh jalan kondisi ${k.nama.toLowerCase()}" loading="lazy">
         <div>
           <h3><i class="titik" style="background:${k.warna}"></i>${k.nama}<span class="rentang">${k.rentang}</span></h3>
           <p>${k.ciri}</p>
+          <p class="kredit-foto">${kreditFoto(k)}</p>
         </div>
       </div>`).join("");
 

@@ -71,17 +71,12 @@
           <select id="selKab"><option value="">Semua Jawa Barat</option></select>
         </div>
 
-        <div class="bidang pencarian">
-          <label for="cari">Cari ruas</label>
-          <input id="cari" type="search" autocomplete="off" placeholder="Nama ruas atau kode, mis. Siliwangi"
-                 role="combobox" aria-expanded="false" aria-controls="saran" aria-autocomplete="list">
-          <ul id="saran" class="saran" role="listbox" hidden></ul>
-        </div>
-
         <fieldset class="kelompok">
           <legend>Lapisan</legend>
           <label class="centang"><input type="checkbox" id="lapSegmen" checked> Segmen kondisi (1 km)</label>
           <label class="centang"><input type="checkbox" id="lapRuas"> Ruas, kondisi rata-rata</label>
+          <label class="centang"><input type="checkbox" id="lapNasional" checked> Jalan nasional dan tol <small class="ket-lap">abu-abu, tanpa data kondisi</small></label>
+          <label class="centang"><input type="checkbox" id="lapKabkota"> Jalan kabupaten/kota <small class="ket-lap">abu-abu, tanpa data kondisi</small></label>
           <label class="centang"><input type="checkbox" id="lapBatas" checked> Batas provinsi</label>
         </fieldset>
 
@@ -166,6 +161,22 @@
 
     <main class="peta-bungkus">
       <div id="peta" aria-label="Peta kondisi jalan"></div>
+
+      <!-- kotak cari dan tombol cepat yang melayang di atas peta, seperti Google Maps -->
+      <div class="atas-peta">
+        <div class="kotak-cari pencarian" role="search">
+          <button type="button" id="btnLipat" class="tombol-ikon" aria-expanded="true" aria-controls="sisi" title="Tampilkan atau sembunyikan panel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span class="sr">Panel</span>
+          </button>
+          <label for="cari" class="sr">Cari ruas jalan</label>
+          <input id="cari" type="search" autocomplete="off" placeholder="Cari ruas jalan, mis. Siliwangi"
+                 role="combobox" aria-expanded="false" aria-controls="saran" aria-autocomplete="list">
+          <svg class="ikon-cari" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+          <ul id="saran" class="saran" role="listbox" hidden></ul>
+        </div>
+        <div class="chip-peta" id="chipKondisi" role="group" aria-label="Tampilkan kondisi"></div>
+      </div>
       <div id="pesanPeta" class="pesan-peta" role="status" hidden></div>
       <div id="galat" class="galat" role="alert" hidden>
         <p id="teksGalat"></p>
