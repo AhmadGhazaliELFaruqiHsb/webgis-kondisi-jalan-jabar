@@ -358,13 +358,21 @@ app.get("/api/peringkat", rute(async (req, res) => {
   const tahun = ambilAngka(req.query.tahun, "tahun", { min: 2000, maks: 2100, bawaan: null });
   const r = await pool.query(
     `SELECT kab_kota, tahun, km_total::float AS total_km, km_rusak_berat::float AS km_rusak_berat,
-            km_rusak_ringan::float AS km_rusak_ringan,
+            km_rusak_ringan::float AS km_rusak_ringan, km_baik::float AS km_baik, km_sedang::float AS km_sedang,
             ROUND(((km_baik + km_sedang) / NULLIF(km_total, 0) * 100)::numeric, 1)::float AS persen_mantap
      FROM v_kondisi_tahunan
      WHERE tahun = COALESCE($1::int, (SELECT MAX(tahun) FROM kondisi_kabkota))
      ORDER BY persen_mantap DESC NULLS LAST, kab_kota`,
     [tahun]
   );
+  res.json(r.rows);
+}));
+
+// Panjang jalan menurut kewenangan (nasional / provinsi / kab-kota) per Kab/Kota, BPS 2019
+app.get("/api/kewenangan", rute(async (req, res) => {
+  const r = await pool.query(
+    `SELECT kab_kota, km_negara::float AS nasional, km_provinsi::float AS provinsi, km_kabkota::float AS kabkota, tahun
+     FROM pembanding_bps ORDER BY (km_negara + km_provinsi + km_kabkota) DESC`);
   res.json(r.rows);
 }));
 

@@ -91,17 +91,23 @@
         <p class="sumber">Data tahunan resmi DBMPR, terpisah dari survei Roadroid sehingga tidak sebanding langsung.</p>
       </section>
 
-      <section class="kartu lebar-7">
-        <div class="blok-kepala"><h2>Peringkat Kabupaten/Kota</h2><span class="label-sumber">Galura</span></div>
-        <div class="alat-tabel">
-          <label class="mini" for="dTahun">Tahun</label>
-          <select id="dTahun"></select>
-          <span class="bantu" style="margin:0 0 0 auto">Persen jalan mantap, klik batang untuk menyaring</span>
-        </div>
-        <div class="grafik-peringkat"><canvas id="cPeringkat" role="img" aria-label="Grafik batang persen jalan mantap per Kabupaten/Kota"></canvas></div>
+      <section class="kartu lebar-12">
+        <div class="blok-kepala"><h2>Tren kemantapan per Kabupaten/Kota</h2><span class="label-sumber">Galura</span></div>
+        <p class="bantu">Persen jalan mantap (baik + sedang) tiap tahun. Makin hijau makin mantap, makin merah makin banyak yang rusak. Klik baris untuk menyaring dashboard.</p>
+        <p class="rata-peringkat" id="dRataPeringkat"></p>
+        <div class="heat-bungkus"><table class="heat" id="dHeat" aria-label="Persen jalan mantap per Kabupaten/Kota tahun 2018 sampai 2025"></table></div>
+        <div class="heat-skala" aria-hidden="true"><span>70% atau kurang</span><i></i><span>100%</span></div>
       </section>
 
-      <section class="kartu lebar-5">
+      <section class="kartu lebar-12">
+        <div class="blok-kepala"><h2>Status jalan menurut kewenangan</h2><span class="label-sumber">BPS · 2019</span></div>
+        <p class="bantu">Panjang jalan di tiap Kabupaten/Kota menurut pengelolanya: jalan nasional (Kementerian PU), jalan provinsi (DBMPR Jawa Barat, yang dipetakan SIKOJAB), dan jalan kabupaten/kota.</p>
+        <div class="status-ringkas" id="dStatusRingkas"></div>
+        <div class="grafik-status"><canvas id="cStatus" role="img" aria-label="Grafik batang panjang jalan nasional, provinsi, dan kabupaten/kota per Kabupaten/Kota"></canvas></div>
+        <p class="sumber">Sumber: BPS Provinsi Jawa Barat, Panjang Jalan Menurut Kabupaten/Kota dan Tingkat Kewenangan Pemerintahan, 2019.</p>
+      </section>
+
+      <section class="kartu lebar-12">
         <div class="blok-kepala"><h2>Ruas dengan IRI tertinggi</h2><span class="label-sumber">Roadroid</span></div>
         <p class="bantu">Sepuluh ruas paling tidak rata. Klik "Peta" untuk melihat ruasnya.</p>
         <div class="tabel-bungkus">

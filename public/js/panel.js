@@ -88,6 +88,7 @@ function alihKondisi(nama, nyala) {
   if (nyala === undefined) nyala = !S.kondisi.has(nama);
   if (nyala) S.kondisi.add(nama); else S.kondisi.delete(nama);
   sinkronKondisi();
+  Peta.saringLain(S.kondisi);
   jadwalMuatPeta();
 }
 
@@ -633,11 +634,18 @@ function pasangUI() {
   // lapisan
   $("lapSegmen").addEventListener("change", (e) => Peta.atur("segmen", e.target.checked));
   $("lapBatas").addEventListener("change", (e) => Peta.atur("batas", e.target.checked));
+  // jalan nasional dan kab/kota (kondisi dari Temanjabar); berkasnya dimuat saat pertama dinyalakan
+  for (const [id, jenis] of [["lapNasional", "nasional"], ["lapKabkota", "kabkota"]]) {
+    $(id).addEventListener("change", (e) => Promise.resolve(Peta.atur(jenis, e.target.checked)).catch((err) => pesan(err.message, 6000)));
+  }
   $("lapRuas").addEventListener("change", (e) => {
     S.lapisanRuas = e.target.checked;
     Peta.atur("ruas", e.target.checked);
     if (e.target.checked) Peta.muatRuas(paramPeta()).catch((err) => pesan(err.message, 6000));
   });
+
+  // mode warna garis: kondisi atau status jalan (kewenangan)
+  document.querySelectorAll("#sisi [data-mode-warna]").forEach((t) => t.addEventListener("click", () => Peta.ubahModeWarna(t.dataset.modeWarna)));
 
   // peta dasar
   // peta dasar: Standar (ikut tema), OSM, Satelit. Pilihan Gelap/Terang tidak ditampilkan karena sudah diatur tema.
@@ -692,6 +700,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("selTahun").innerHTML = tahun.map((t) => `<option value="${t}">${t}</option>`).join("");
 
     S.batasJabar = await Peta.muatBatas();
+    for (const [id, jenis] of [["lapNasional", "nasional"], ["lapKabkota", "kabkota"]]) {
+      if ($(id).checked) Promise.resolve(Peta.atur(jenis, true)).catch((err) => pesan(err.message, 6000));
+    }
     Peta.zoomBatas(S.batasJabar);
     await Promise.all([muatRingkasan(), muatPeta()]);
     panaskanLokasi();

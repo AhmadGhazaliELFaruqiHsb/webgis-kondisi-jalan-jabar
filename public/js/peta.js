@@ -16,15 +16,22 @@ const Peta = (() => {
   let rSegmen = null;
   let aksiKlikTitik = null;
   let kembali = { pilihRuas() {}, detail() {} };
-  const visibel = { segmen: true, ruas: false, batas: true };
+  const visibel = { segmen: true, ruas: false, batas: true, nasional: true, kabkota: true };
+  // jalan nasional dan kab/kota: kondisi dari Temanjabar (bukan survei IRI SIKOJAB), dimuat dari berkas GeoJSON statis
+  const grupLain = { nasional: L.layerGroup(), kabkota: L.layerGroup() };
+  const sudahMuat = { nasional: false, kabkota: false };
+  let kondisiLain = new Set(KONDISI.map((k) => k.nama));
   // jalan non-provinsi (abu-abu, tanpa data kondisi): dimuat dari berkas statis public/data saat pertama dinyalakan
 
   const tebal = (z) => (z <= 7 ? 1.8 : z <= 8 ? 2.2 : z <= 9 ? 2.8 : z <= 10 ? 3.4 : z <= 11 ? 4.2 : z <= 12 ? 5 : 6.5);
   const tebalSekarang = () => tebal(map.getZoom());
 
-  const gayaSegmen = (f) => ({ color: INFO[f.properties.kondisi].warna, weight: tebalSekarang(), opacity: 1, lineCap: "round", lineJoin: "round" });
+  // mode warna garis: "kondisi" (baik..rusak berat) atau "status" (kewenangan: nasional / provinsi / kab-kota)
+  let modeWarna = "kondisi";
+  const warnaGaris = (kondisi, status = "provinsi") => (modeWarna === "status" ? STATUS_JALAN[status].warna : INFO[kondisi].warna);
+  const gayaSegmen = (f) => ({ color: warnaGaris(f.properties.kondisi), weight: tebalSekarang(), opacity: 1, lineCap: "round", lineJoin: "round" });
   const gayaBayang = () => ({ color: warnaTema("bayang-jalan"), weight: tebalSekarang() + 2.6, opacity: 0.7, lineCap: "round", lineJoin: "round" });
-  const gayaRuas = (f) => ({ color: INFO[f.properties.kondisi].warna, weight: Math.max(1.5, tebalSekarang() - 1), opacity: 0.9, lineCap: "round" });
+  const gayaRuas = (f) => ({ color: warnaGaris(f.properties.kondisi), weight: Math.max(1.5, tebalSekarang() - 1), opacity: 0.9, lineCap: "round" });
   const gayaSorot = () => ({ color: warnaTema("aksen"), weight: tebalSekarang() + 6, opacity: 0.95, lineCap: "round", lineJoin: "round" });
 
   // arah segmen (titik awal ke titik akhir garis), agar kamera Street View menghadap sepanjang jalan
@@ -50,6 +57,7 @@ const Peta = (() => {
       <div class="pop-nama">${esc(p.nm_ruas)}</div>
       <div class="pop-kab">${esc(judul(p.kab_kota))}</div>
       <div class="pop-baris"><span>Segmen</span><span>Km ${fmt(p.km_awal, 1)} - ${fmt(p.km_akhir, 1)}</span></div>
+      <div class="pop-baris"><span>Status jalan</span><span>Jalan provinsi</span></div>
       <div class="pop-baris"><span>Nilai IRI</span><span>${fmt(p.nilai_iri, 2)} m/km</span></div>
       <div class="pop-baris"><span>Kondisi</span><span class="chip" style="background:${k.warna};color:${k.teks}">${k.nama}</span></div>
       <div class="pop-aksi"><button type="button" class="tombol" data-aksi="detail" data-id="${esc(p.idruas)}">Lihat detail ruas</button>${latlng
@@ -93,9 +101,11 @@ const Peta = (() => {
     const ikonDetail = {
       lapSegmen: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 26 L16 18 L28 20 L44 6" stroke="#2E9E4F" stroke-width="4" fill="none"/><path d="M16 18 L28 20" stroke="#F2B705" stroke-width="4"/><path d="M28 20 L36 13" stroke="#F08A24" stroke-width="4"/><path d="M36 13 L44 6" stroke="#D63A2F" stroke-width="4"/></svg>',
       lapRuas: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 8 C14 10 18 24 28 22 S40 10 44 12" stroke="#F08A24" stroke-width="5" fill="none" stroke-linecap="round"/></svg>',
+      lapNasional: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M2 26 C14 22 22 10 46 6" stroke="#2E9E4F" stroke-width="4.5" fill="none"/><path d="M30 12 C36 10 40 8 46 6" stroke="#F2B705" stroke-width="4.5" fill="none"/></svg>',
+      lapKabkota: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M4 6 L20 14 L18 28" stroke="#F08A24" stroke-width="2" fill="none"/><path d="M20 14 L44 10" stroke="#2E9E4F" stroke-width="2" fill="none"/><path d="M30 12 L34 30" stroke="#D63A2F" stroke-width="2" fill="none"/><path d="M8 22 L18 20" stroke="#F2B705" stroke-width="2" fill="none"/></svg>',
       lapBatas: '<svg viewBox="0 0 48 32"><rect width="48" height="32" fill="#eef1f4"/><path d="M6 6 L30 4 L42 14 L38 28 L12 26 Z" stroke="#5F6B78" stroke-width="2" stroke-dasharray="4 3" fill="none"/></svg>',
     };
-    const NAMA_DETAIL = { lapSegmen: "Segmen kondisi", lapRuas: "Ruas rata-rata", lapBatas: "Batas provinsi" };
+    const NAMA_DETAIL = { lapSegmen: "Jalan provinsi", lapRuas: "Ruas rata-rata", lapNasional: "Jalan nasional", lapKabkota: "Jalan kab/kota", lapBatas: "Batas provinsi" };
     const ctrlLapisan = L.control({ position: "bottomleft" });
     ctrlLapisan.onAdd = () => {
       const d = L.DomUtil.create("div", "kontrol-lapisan");
@@ -107,6 +117,11 @@ const Peta = (() => {
           <p class="pl-judul">Jenis peta</p>
           <div class="pl-grid">${JENIS_PETA.map((k) => `<button type="button" class="pl-ubin" data-k="${k}" aria-pressed="false">
               <img src="${pratinjau(k)}" alt="" loading="lazy" class="${k === "standar" ? "dasar-redup" : ""}"><span>${namaJenisPeta(k)}</span></button>`).join("")}</div>
+          <p class="pl-judul">Warnai jalan menurut</p>
+          <div class="pl-mode">
+            <button type="button" data-mode-warna="kondisi" aria-pressed="true">Kondisi</button>
+            <button type="button" data-mode-warna="status" aria-pressed="false">Status jalan</button>
+          </div>
           <p class="pl-judul">Detail peta</p>
           <div class="pl-grid">${Object.keys(ikonDetail).map((id) => `<button type="button" class="pl-ubin" data-lap="${id}" aria-pressed="false">
               ${ikonDetail[id]}<span>${NAMA_DETAIL[id]}</span></button>`).join("")}</div>
@@ -132,6 +147,7 @@ const Peta = (() => {
         const b = e.target.closest("button");
         if (!b) return;
         if (b.dataset.k) kembali.pilihDasar && kembali.pilihDasar(b.dataset.k);
+        if (b.dataset.modeWarna) ubahModeWarna(b.dataset.modeWarna);
         if (b.dataset.lap) { // menyalakan/mematikan lapisan lewat kotak centang yang sama di panel samping
           const c = document.getElementById(b.dataset.lap);
           if (c) { c.checked = !c.checked; c.dispatchEvent(new Event("change", { bubbles: true })); segarDetail(); }
@@ -151,7 +167,7 @@ const Peta = (() => {
     L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
 
     // urutan tumpukan: batas < ruas < bayangan < sorotan < segmen < hasil pencarian titik
-    [["batas", 350], ["ruas", 380], ["bayang", 400], ["sorot", 405], ["segmen", 410], ["hasil", 420]].forEach(([n, z]) => {
+    [["batas", 350], ["lain", 370], ["ruas", 380], ["bayang", 400], ["sorot", 405], ["segmen", 410], ["hasil", 420]].forEach(([n, z]) => {
       map.createPane(n).style.zIndex = z;
     });
 
@@ -168,7 +184,10 @@ const Peta = (() => {
       const d = L.DomUtil.create("div", "legenda");
       d.innerHTML = `<h4 role="button" tabindex="0" aria-expanded="true" title="Klik untuk menyembunyikan atau menampilkan">Kondisi jalan</h4><ul>${KONDISI.map((k) =>
         `<li><i style="background:${k.warna}"></i>${k.nama}<span>${k.rentang.replace("IRI ", "")}</span></li>`).join("")}</ul>
-        <p>Hanya jalan provinsi (297 ruas) yang diberi warna. IRI dalam m/km, survei Roadroid Jan 2021</p>`;
+        <ul class="leg-status" hidden>${Object.values(STATUS_JALAN).map((s) =>
+        `<li><i style="background:${s.warna}"></i>${s.nama}<span>${fmt(s.km_bps, 0)} km</span></li>`).join("")}</ul>
+        <p class="leg-status" hidden>Panjang menurut BPS 2019 (Jawa Barat). Jalan nasional dikelola Kementerian PU, provinsi oleh DBMPR Jawa Barat, kab/kota oleh pemerintah kab/kota.</p>
+        <p><b>Garis tebal</b>: jalan provinsi, IRI Roadroid Jan 2021.<br><b>Garis tipis</b>: jalan nasional (Feb 2024) dan kab/kota, warna = kondisi terpanjang.</p>`;
       L.DomEvent.disableClickPropagation(d);
       const judulLegenda = d.querySelector("h4");
       const alih = (tutup) => { d.classList.toggle("tutup", tutup); judulLegenda.setAttribute("aria-expanded", String(!tutup)); };
@@ -208,6 +227,19 @@ const Peta = (() => {
   }
 
   // gambar ulang gaya garis (dipakai saat zoom berubah dan saat tema berganti)
+  function ubahModeWarna(mode) {
+    modeWarna = mode;
+    segarkanGaya();
+    for (const j of Object.keys(grupLain)) grupLain[j].eachLayer((g) => g.setStyle && g.setStyle(gayaLain(j)));
+    const leg = ctrlLegenda && ctrlLegenda.getContainer();
+    if (leg) {
+      leg.querySelector("h4").textContent = mode === "status" ? "Status jalan (kewenangan)" : "Kondisi jalan";
+      leg.querySelectorAll(":scope > ul:not(.leg-status), :scope > p:not(.leg-status)").forEach((e) => (e.hidden = mode === "status"));
+      leg.querySelectorAll(".leg-status").forEach((e) => (e.hidden = mode !== "status"));
+    }
+    document.querySelectorAll("[data-mode-warna]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.modeWarna === mode));
+  }
+
   function segarkanGaya() {
     grupSegmen.eachLayer((g) => g.setStyle && g.eachLayer && g.setStyle(g.options.style));
     grupRuas.eachLayer((g) => g.setStyle && g.setStyle(g.options.style));
@@ -257,7 +289,7 @@ const Peta = (() => {
       onEachFeature: (f, layer) => kaitkan(f, layer, (e, p) => {
         L.popup({ maxWidth: 300, className: "pop" }).setLatLng(e.latlng).setContent(isiPopup(p, e.latlng, arahSegmen(f.geometry))).openOn(map);
         kembali.pilihRuas(p.idruas, e.latlng);
-        FotoLokasi.strip(e.latlng.lat, e.latlng.lng, p.nm_ruas); // deretan foto di bawah peta, seperti Google Maps
+        FotoLokasi.strip(e.latlng.lat, e.latlng.lng, p.nm_ruas, arahSegmen(f.geometry)); // deretan foto di bawah peta, seperti Google Maps
       }),
     });
     grupSegmen.clearLayers();
@@ -282,14 +314,49 @@ const Peta = (() => {
 
   function atur(nama, nyala) {
     visibel[nama] = nyala;
+    if (nama in grupLain) return aturLain(nama, nyala);
     const grup = { segmen: grupSegmen, ruas: grupRuas, batas: lapBatas }[nama];
     if (!grup) return;
     if (nyala) grup.addTo(map); else map.removeLayer(grup);
     if (nama === "ruas" && nyala) grupRuas.eachLayer((l) => l.bringToBack && l.bringToBack());
   }
 
+  // ---------------------------------------------------------------- jalan nasional dan kab/kota
+  const GAYA_LAIN = { nasional: { weight: 3.2, opacity: 0.95 }, kabkota: { weight: 1.5, opacity: 0.85 } };
+  const NAMA_LAIN = { nasional: "Jalan nasional", kabkota: "Jalan kabupaten/kota" };
+  const gayaLain = (jenis) => (f) => ({ ...GAYA_LAIN[jenis], color: warnaGaris(f.properties.kelas, jenis),
+    opacity: kondisiLain.has(f.properties.kelas) ? GAYA_LAIN[jenis].opacity : 0, interactive: kondisiLain.has(f.properties.kelas) });
+  async function muatLain(jenis) {
+    const r = await fetch(`data/kondisi_${jenis}.geojson`);
+    if (!r.ok) throw new Error(`Data ${NAMA_LAIN[jenis].toLowerCase()} belum tersedia.`);
+    const data = await r.json();
+    const rLain = L.canvas({ pane: "lain", padding: 0.4, tolerance: 4 });
+    grupLain[jenis].addLayer(L.geoJSON(data, {
+      pane: "lain", renderer: rLain, style: gayaLain(jenis),
+      onEachFeature: (f, l) => {
+        const p = f.properties;
+        l.bindTooltip(() => `<strong>${esc(p.nama)}</strong><br>Status: <b>${NAMA_LAIN[jenis]}</b>${p.kab ? `, ${esc(p.kab)}` : ""}<br>
+          <span class="chip" style="background:${INFO[p.kelas].warna};color:${INFO[p.kelas].teks}">${p.kelas}</span> mantap ${fmt(p.mantap, 1)}%<br>
+          <small>Baik ${fmt(p.persen[0], 0)}% · Sedang ${fmt(p.persen[1], 0)}% · R. ringan ${fmt(p.persen[2], 0)}% · R. berat ${fmt(p.persen[3], 0)}%<br>Sumber: ${esc(p.sumber)}</small>`,
+          { sticky: true, className: "tip", opacity: 1 });
+      },
+    }));
+    sudahMuat[jenis] = true;
+  }
+  async function aturLain(jenis, nyala) {
+    visibel[jenis] = nyala;
+    if (!nyala) { map.removeLayer(grupLain[jenis]); return; }
+    if (!sudahMuat[jenis]) await muatLain(jenis);
+    if (visibel[jenis]) grupLain[jenis].addTo(map);
+  }
+  // filter kondisi juga berlaku untuk jalan nasional dan kab/kota
+  function saringLain(kondisi) {
+    kondisiLain = new Set(kondisi);
+    for (const j of Object.keys(grupLain)) grupLain[j].eachLayer((g) => g.setStyle && g.setStyle(gayaLain(j)));
+  }
+
   const bukaPopupSegmen = (latlng, props, arah = 0) => {
-    FotoLokasi.strip(latlng.lat, latlng.lng, props.nm_ruas);
+    FotoLokasi.strip(latlng.lat, latlng.lng, props.nm_ruas, arah);
     return L.popup({ maxWidth: 300, className: "pop" }).setLatLng(latlng).setContent(isiPopup(props, latlng, arah)).openOn(map);
   };
 
@@ -369,7 +436,7 @@ const Peta = (() => {
 
   const ukuran = () => map && map.invalidateSize();
 
-  return { init, ubahDasar, segarkanGaya, muatBatas, muatSegmen, muatRuas, atur, sorotRuas, zoomKe, zoomBatas, bukaPopupSegmen,
+  return { init, ubahDasar, ubahModeWarna, segarkanGaya, muatBatas, muatSegmen, muatRuas, atur, saringLain, sorotRuas, zoomKe, zoomBatas, bukaPopupSegmen,
            pilihTitik, batalPilihTitik, tampilHasil, bersihHasil, fokusHasil, jarakMeter, ukuran,
            get peta() { return map; } };
 })();

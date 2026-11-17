@@ -79,10 +79,7 @@ const FotoLokasi = (() => {
         </div>` : ""}
         <button type="button" class="sf-tutup" data-aksi="tutup" aria-label="Sembunyikan foto">Sembunyikan ▾</button>
       </div>`;
-    const tileSV = `<a class="sf-item sf-sv" href="${sv}" target="_blank" rel="noopener noreferrer" title="Buka Google Street View di titik ini (tab baru)">
-        <span class="sf-sv-ikon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.6"/><path d="M8.5 9.5h7l-1 6h-1.6l-.6 6h-1.6l-.6-6H9.5z"/></svg></span>
-        <span class="sf-label">Street View ↗<small>pilih tahun di Google Maps</small></span></a>`;
+    const tileSV = `<div class="sf-item sf-sv" data-sv></div>`;
     let isi;
     if (pesan) isi = `<p class="sf-pesan">${pesan}</p>`;
     else {
@@ -98,13 +95,25 @@ const FotoLokasi = (() => {
              ${titik.radius < 1000 ? `<button type="button" class="tombol" data-aksi="luas">Cari sampai 1 km</button>` : ""}
              Untuk tahun lain, buka Street View.</p>`;
     }
+    const svLama = strip.querySelector(".sf-sv[data-sv]");
     strip.innerHTML = `${kepala}<div class="sf-deret">${tileSV}${isi}</div>
       ${data ? `<p class="sf-sumber">${data.sumber.map((s) => `${NAMA_SUMBER[s.kode] || s.nama}: ${s.ok ? `${s.jumlah} foto` : "tidak dapat diakses"}`).join(" · ")}</p>` : ""}`;
+    // Street View asli di kotak pertama (Google Maps Embed tanpa API key); iframe lama dipakai lagi bila titiknya sama
+    const tempat = strip.querySelector(".sf-sv[data-sv]");
+    const kunci = `${titik.lat},${titik.lng},${titik.arah}`;
+    if (svLama && svLama.dataset.kunci === kunci) tempat.replaceWith(svLama);
+    else {
+      tempat.dataset.kunci = kunci;
+      tempat.innerHTML = `<iframe src="${urlStreetViewSemat(titik.lat, titik.lng, titik.arah)}" title="Google Street View di titik ini"
+          loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+        <span class="sf-label">Street View<small>geser untuk melihat sekitar</small></span>
+        <a class="sf-sv-buka" href="${sv}" target="_blank" rel="noopener noreferrer" title="Buka di Google Maps untuk memilih tahun lain">Tahun lain ↗</a>`;
+    }
   }
 
-  async function muatStrip(lat, lng, nama, radius = 300) {
+  async function muatStrip(lat, lng, nama, radius = 300, arah = titik?.arah || 0) {
     siapkanStrip();
-    titik = { lat, lng, nama, radius };
+    titik = { lat, lng, nama, radius, arah };
     data = null; tahunStrip = "semua";
     strip.hidden = false;
     document.body.classList.add("strip-buka");
@@ -207,7 +216,7 @@ const FotoLokasi = (() => {
 
   return {
     pasang(peta) { map = peta; lapTitik = L.layerGroup().addTo(map); },
-    strip: (lat, lng, nama) => muatStrip(lat, lng, nama, 300),
+    strip: (lat, lng, nama, arah = 0) => muatStrip(lat, lng, nama, 300, arah),
     buka: (lat, lng, nama) => bukaFoto(lat, lng, nama, 300),
     tutup: tutupStrip,
   };

@@ -73,9 +73,19 @@
 
         <fieldset class="kelompok">
           <legend>Lapisan</legend>
-          <label class="centang"><input type="checkbox" id="lapSegmen" checked> Segmen kondisi (1 km)</label>
+          <label class="centang"><input type="checkbox" id="lapSegmen" checked> Jalan provinsi, segmen 1 km <small class="ket-lap">survei IRI Roadroid, Jan 2021</small></label>
           <label class="centang"><input type="checkbox" id="lapRuas"> Ruas, kondisi rata-rata</label>
+          <label class="centang"><input type="checkbox" id="lapNasional" checked> Jalan nasional <small class="ket-lap">kondisi Bina Marga, Feb 2024</small></label>
+          <label class="centang"><input type="checkbox" id="lapKabkota" checked> Jalan kabupaten/kota <small class="ket-lap">kondisi dari Temanjabar</small></label>
           <label class="centang"><input type="checkbox" id="lapBatas" checked> Batas provinsi</label>
+        </fieldset>
+
+        <fieldset class="kelompok">
+          <legend>Warnai jalan menurut</legend>
+          <div class="pilihan-dasar">
+            <button type="button" data-mode-warna="kondisi" aria-pressed="true">Kondisi</button>
+            <button type="button" data-mode-warna="status" aria-pressed="false">Status jalan</button>
+          </div>
         </fieldset>
 
         <fieldset class="kelompok">

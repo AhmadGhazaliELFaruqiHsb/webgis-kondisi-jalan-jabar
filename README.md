@@ -47,7 +47,7 @@ webgis-kondisi-jalan/
 ├── public/      tampilan web
 │   ├── index.html, dashboard.html, peta.html, validasi.html, tentang.html
 │   ├── css/     style.css (tema + aplikasi peta), situs.css (halaman situs)
-│   ├── img/kondisi/     foto contoh 4 kelas kondisi; galeri/ berisi 10 foto tambahan
+│   ├── img/kondisi/     foto contoh 4 kelas; ruas/ = 257 foto galeri; pemeliharaan/ = foto sebelum/sesudah DBMPR
 │   ├── js/      konfigurasi.js, situs.js (menu + tema), peta.js (Leaflet), panel.js (panel peta),
 │   │            dashboard.js, validasi.js
 │   └── vendor/  Leaflet 1.9.4, Chart.js 4.4.7, font Barlow (disalin lokal)
@@ -83,6 +83,9 @@ Leaflet, Chart.js, dan font sudah ada di `public/vendor/`, jadi tidak perlu CDN.
 | `data/pembanding_skj_dbmpr.csv` | IRI per segmen resmi DBMPR (survei Roadroid Jan 2021, 2.633 segmen), untuk validasi | Temanjabar, layer `6_rj_prov_skj` |
 | `data/pembanding_visual_dbmpr.csv` | Luas permukaan per kelas kerusakan, survei visual 29 ruas Sukabumi, untuk validasi | Temanjabar, layer `1_rj_prov_kemantapan` |
 | `data/panjang_jalan_bps_2019.csv` | Panjang jalan menurut Kab/Kota dan kewenangan (negara, provinsi, kab/kota), 2019, untuk validasi | [BPS Provinsi Jawa Barat](https://jabar.bps.go.id/) |
+| `public/data/kondisi_nasional.geojson` | Kondisi jalan nasional per ruas (256 ruas), kelas = kondisi terpanjang; ditampilkan sebagai garis tipis di peta | Temanjabar, layer `2_rj_nasional` (Ditjen Bina Marga, pembaruan 28 Feb 2024) |
+| `public/data/kondisi_kabkota.geojson` | Kondisi jalan kabupaten/kota per ruas (8.766 ruas yang punya data kondisi) | Temanjabar, layer `5_rj_kab_kota` |
+| `data/ambil_kondisi_lain.py` | Script pengunduh dan penyederhana dua berkas di atas | — |
 | `data/ambil_pembanding.py` | Script pengunduh dua berkas pembanding di atas (WFS Temanjabar) | — |
 
 Klasifikasi kondisi dari IRI (m/km): Baik < 4, Sedang 4–8, Rusak Ringan 8–12, Rusak Berat ≥ 12. Jalan **mantap** = Baik + Sedang.
@@ -135,6 +138,10 @@ Semua endpoint bersifat `GET` dan memakai kueri berparameter.
 
 Kesalahan dikembalikan sebagai `{ "galat": "pesan" }` dengan kode 400 (input salah), 404, 503 (database tidak dapat diakses), atau 500.
 
+## Status jalan (kewenangan)
+
+Di halaman **Peta**, pilihan *Warnai jalan menurut → Status jalan* (panel samping atau tombol Lapisan) mewarnai garis menurut pengelolanya: jalan nasional (ungu), provinsi (biru), dan kabupaten/kota (hijau toska). Pop-up segmen dan tooltip juga menyebut status jalannya. Di **Dashboard**, kartu *Status jalan menurut kewenangan* menampilkan panjang jalan nasional, provinsi, dan kab/kota per Kabupaten/Kota dari BPS 2019 (`/api/kewenangan`, tabel `pembanding_bps`): total 1.791 km nasional, 2.362 km provinsi, dan 23.436 km kab/kota.
+
 ## Validasi keakuratan data
 
 `npm run validasi` (atau tombol *Validasi data* di web) menjalankan 26 pemeriksaan langsung pada tabel PostGIS, dalam tujuh kelompok:
@@ -161,13 +168,11 @@ Hasil pada data saat ini dibagi dua jenis:
 
 ## Gambar kondisi
 
-Foto contoh tiap kelas ada di `public/img/kondisi/foto-*.jpg`, dan 10 foto tambahan untuk galeri Beranda ada di `public/img/kondisi/galeri/` (Baik 4, Sedang 3, Rusak Ringan 3, Rusak Berat 4 termasuk foto utama). Enam foto galeri berasal dari Jawa Barat (Kab. Cirebon dan Kab. Garut). Semua foto dari Wikimedia Commons berlisensi CC BY / CC BY-SA; pemilik, lokasi, dan lisensi ditampilkan di bawah setiap foto dan di halaman Tentang. Kelas pada foto ditentukan dari tampilan permukaan jalan sebagai contoh visual, bukan hasil pengukuran IRI. Untuk melihat kondisi nyata ruas tertentu, pakai tombol **Street View** di halaman Peta.
+Foto contoh tiap kelas ada di `public/img/kondisi/foto-*.jpg` (Wikimedia Commons, CC BY / CC BY-SA). **Galeri Beranda** berisi 257 foto lapangan asli, satu per ruas jalan provinsi: dokumentasi pemeliharaan DBMPR Jawa Barat 2022–2023 (Temanjabar, layer WFS `pemeliharaan`, kolom `foto_awal`; berkas di `tj.temanjabar.net/storage/pekerjaan/`). Setiap foto dicocokkan ke segmen survei terdekat (maks. 100 m) dengan PostGIS, lalu per ruas dipilih foto terbaru (diutamakan pekerjaan perkerasan). Foto diperkecil ke 800 px di `public/img/kondisi/ruas/`, datanya di `public/js/foto_ruas.js`. Kelas dan IRI dari survei Roadroid Januari 2021, jadi kondisi di foto bisa berbeda dari kelasnya.
 
 Bagian **Sebelum dan sesudah perbaikan** di Beranda memakai foto asli dokumentasi pemeliharaan DBMPR Jawa Barat dari Temanjabar (layer WFS `pemeliharaan`, kolom `foto_awal` dan `foto_akhir`; berkasnya di `tj.temanjabar.net/storage/pekerjaan/`). Dipilih 12 pekerjaan tambal sulam hotmix, dua dari setiap UPTD, lalu foto diperkecil ke lebar 1.200 px dan disimpan di `public/img/kondisi/pemeliharaan/`. Datanya ada di `public/js/foto_pemeliharaan.js`, termasuk kondisi segmen survei Roadroid terdekat (maks. 200 m) yang dicari dengan PostGIS. Foto diambil 2021–2023 sedangkan survei Januari 2021, jadi keduanya tidak selalu sama persis.
 
 Di halaman **Peta**, pop-up segmen punya tombol **Foto per tahun**. Tombol ini membuka jendela berisi foto lapangan dalam radius 300 m (bisa diperluas ke 1 km) dengan pilihan tahun 2018–2025, mirip *Lihat tanggal lain* di Google Maps. Foto diambil dari Temanjabar (layer `pemeliharaan`, foto sebelum, saat, dan sesudah pekerjaan; tersedia 2021–2023) dan Wikimedia Commons (foto bertanda lokasi berlisensi bebas). Tahun yang tidak punya foto ditampilkan apa adanya. Untuk tahun lain tersedia tombol Street View, karena foto Google tidak boleh diambil langsung. Sumber lain yang dicoba: Mapillary (perlu token akun), KartaView (server tidak dapat diakses), dan Flickr (perlu API key).
-
-Untuk menambah foto, taruh berkas di `public/img/kondisi/galeri/` lalu tambahkan entri pada `GALERI_TAMBAHAN` di `public/js/konfigurasi.js` (kelas, lokasi, pemilik, lisensi, dan tautan sumber).
 
 ## Lokasi saya
 

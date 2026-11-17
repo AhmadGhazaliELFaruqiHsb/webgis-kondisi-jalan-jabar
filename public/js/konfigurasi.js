@@ -32,35 +32,13 @@ const KONDISI = [
 ];
 const INFO = Object.fromEntries(KONDISI.map((k) => [k.nama, k]));
 
-// Galeri: foto tambahan per kelas (Wikimedia Commons). Kelas dipilih dari tampilan foto, sebagai contoh visual;
-// bukan hasil pengukuran IRI. Foto utama tiap kelas (di atas) ikut ditampilkan di galeri.
-const COMMONS = (berkas) => `https://commons.wikimedia.org/wiki/File:${berkas.replace(/ /g, "_")}`;
-const GALERI_TAMBAHAN = [
-  { kelas: "Baik", gambar: "img/kondisi/galeri/baik-palimanan-cirebon.jpg", lokasi: "Jl. Raya Palimanan, Kab. Cirebon",
-    oleh: "Jie73", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan Raya Palimanan-.jpg") },
-  { kelas: "Baik", gambar: "img/kondisi/galeri/baik-gempol-cirebon.jpg", lokasi: "Jl. Raya Gempol–Palimanan, Kab. Cirebon",
-    oleh: "Jie73", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan Raya KH Agus Salim Gempol.jpg") },
-  { kelas: "Baik", gambar: "img/kondisi/galeri/baik-ciledug-garut.jpg", lokasi: "Jl. Ciledug, Kab. Garut",
-    oleh: "Ketut Turag", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan ciledug garut.jpg") },
-  { kelas: "Sedang", gambar: "img/kondisi/galeri/sedang-ciwaringin-cirebon.jpg", lokasi: "Jl. Raya Ciwaringin, Kab. Cirebon",
-    oleh: "Jie73", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan Raya Ciwaringin.jpg") },
-  { kelas: "Sedang", gambar: "img/kondisi/galeri/sedang-limbangan-garut.jpg", lokasi: "Jalan beton, Limbangan, Kab. Garut",
-    oleh: "Laela Megarani", lisensi: "CC BY-SA 4.0", url: COMMONS("Wisata alam .jpg") },
-  { kelas: "Rusak Ringan", gambar: "img/kondisi/galeri/rusak-ringan-kaswari-kebumen.jpg", lokasi: "Penambalan lubang, Kebumen, Jawa Tengah",
-    oleh: "DARMAS BS 9", lisensi: "CC BY-SA 4.0", url: COMMONS("Perbaikan Jalan Aspal Yg Berlubang Di Jl.Kaswari Kebumen Oleh PUPR Kab.Kebumen.jpg") },
-  { kelas: "Rusak Ringan", gambar: "img/kondisi/galeri/rusak-ringan-ambal-kebumen.jpg", lokasi: "Ambal, Kebumen, Jawa Tengah",
-    oleh: "SATELIT BM9", lisensi: "CC BY-SA 4.0", url: COMMONS("Rambu Hati Hati Jalan Berlubang Di Ambal Kebumen 2022.jpg") },
-  { kelas: "Rusak Berat", gambar: "img/kondisi/galeri/rusak-berat-cikandang-garut.jpg", lokasi: "Cikandang, Kab. Garut",
-    oleh: "Mochammad chotib", lisensi: "CC BY-SA 4.0", url: COMMONS("CAM00298.jpg") },
-  { kelas: "Rusak Berat", gambar: "img/kondisi/galeri/rusak-berat-soegiono-kebumen.jpg", lokasi: "Jalan amblas, Kebumen, Jawa Tengah",
-    oleh: "DARMAS SB 9", lisensi: "CC BY-SA 4.0", url: COMMONS("Jalan amblas Di Jl.Soegiono Kebumen Jateng Indonesia.jpg") },
-  { kelas: "Rusak Berat", gambar: "img/kondisi/galeri/rusak-berat-samarinda.jpg", lokasi: "Jalan amblas, Samarinda, Kalimantan Timur",
-    oleh: "Kurniawan Dwi", lisensi: "CC BY 3.0", url: COMMONS("Jalan Samarinda Amblas - panoramio.jpg") },
-];
-const GALERI = [
-  ...KONDISI.map((k) => ({ kelas: k.nama, gambar: k.gambar, ...k.foto })),
-  ...GALERI_TAMBAHAN,
-].sort((a, b) => KONDISI.findIndex((k) => k.nama === a.kelas) - KONDISI.findIndex((k) => k.nama === b.kelas));
+// Status (kewenangan) jalan, untuk mode warna "Status jalan" di peta. km_bps = panjang di Jawa Barat menurut BPS 2019
+// (data/panjang_jalan_bps_2019.csv: jalan negara 1.789 km, provinsi 2.361 km, kabupaten/kota 23.436 km).
+const STATUS_JALAN = {
+  nasional: { nama: "Jalan nasional", warna: "#A23BEC", km_bps: 1789 },
+  provinsi: { nama: "Jalan provinsi", warna: "#1E88E5", km_bps: 2361 },
+  kabkota: { nama: "Jalan kabupaten/kota", warna: "#26A69A", km_bps: 23436 },
+};
 
 // Baris kredit foto (HTML); menerima kelas kondisi (k.foto) atau entri galeri
 const kreditFoto = (k) => {
